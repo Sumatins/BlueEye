@@ -31,8 +31,10 @@ dashboard with statistics and a machine-readable JSON report.
 ## Features
 
 - **Professional multi-page web UI** — Dashboard, Detect, Models, Analytics,
-  History and About, with a marine design system, loading states, friendly
-  error cards and responsive layout
+  History and About, with a grouped sidebar, one consistent icon set
+  (Material Symbols Rounded), a deep-ocean design system, real metadata
+  cards, status badges, honest empty states, loading states, friendly error
+  cards and a responsive layout
 - **Image detection** — upload JPG/JPEG/PNG/WEBP, get an annotated image back
   in a before/after view
 - **Video detection** — frame-by-frame processing of MP4/AVI/MOV/MKV into an
@@ -43,7 +45,7 @@ dashboard with statistics and a machine-readable JSON report.
 - **Two pretrained models** — *Fish & Invertebrates* (15 classes) and
   *MegaFauna* (shark / ray / turtle), selectable or combined (`Auto`)
 - **Extensible model registry** — friendly model cards with real status
-  (🟢 ready / 🔴 not installed); new models (e.g. regional species) are added
+  labels (installed / not installed); new models (e.g. regional species) are added
   with a JSON entry + a `.pt` file, **no code changes** — see
   [`docs/regional_models.md`](docs/regional_models.md)
 - **Configurable confidence threshold** (slider, or one click for each model's
@@ -191,12 +193,18 @@ Open http://localhost:8501 and use the sidebar navigation:
 
 | Page | What it does |
 | --- | --- |
-| 🏠 **Dashboard** | Welcome, quick actions, device/model status, stored statistics |
-| 🔍 **Detect** | The 5-step workflow: upload → choose model → set confidence → **Detect Marine Life** → results |
-| 🧠 **Models** | Model cards with friendly names, class lists, provenance and 🟢/🔴 status; download weights; add custom/regional models |
-| 📊 **Analytics** | Charts computed from your stored detections (top species, confidence distribution) |
-| 🕘 **History** | Every finished run with inputs, models, thresholds and outputs; export/clear |
-| ℹ️ **About** | What BlueEye does, how it works, limitations and attribution |
+| **Dashboard** | Welcome, quick actions, device/model status, stored statistics |
+| **Detect** | The 5-step workflow: upload → choose model → set confidence → **Detect Marine Life** → results |
+| **Models** | Model cards with friendly names, class lists, provenance and installed / not-installed status; download weights; add custom/regional models |
+| **Analytics** | Charts computed from your stored detections (top species, confidence distribution) |
+| **History** | Every finished run with inputs, models, thresholds and outputs; export/clear |
+| **About** | What BlueEye does, how it works, limitations and attribution |
+
+The sidebar groups the pages (*Overview* / *AI and data* / *Activity* /
+*Information*) and a single icon set — **Material Symbols Rounded**, bundled
+locally with Streamlit — is used across the sidebar, buttons, cards, model
+tiles and empty states. The whole interface is one consistent design system
+(see [`app/ui/theme.py`](app/ui/theme.py) and [`app/ui/icons.py`](app/ui/icons.py)).
 
 The Detect page shows an original/result side-by-side view, a summary
 (total objects, species, average/max confidence), a detections table and
@@ -449,7 +457,8 @@ blueeye/
 │   │   └── history.py              # persistent detection history + aggregates
 │   └── ui/
 │       ├── streamlit_app.py         # shell: navigation, sidebar, routing
-│       ├── theme.py                 # design system (ocean CSS + page ids)
+│       ├── theme.py                 # design system (ocean CSS, page ids, nav)
+│       ├── icons.py                 # single icon set (Material Symbols Rounded)
 │       ├── components.py            # reusable cards, badges, tables, notices
 │       ├── state.py                 # session state, upload intake, history
 │       └── pages/                   # Dashboard, Detect, Models, Analytics,
