@@ -1,0 +1,28 @@
+# BlueEye dataset config - Gharial detection
+# ---------------------------------------------------------------------------
+# Habitat : Freshwater - clear, fast-flowing Indian rivers (Chambal, Girwa,
+#           Ganga, Mahanadi, Son). Gavialis gangeticus, Critically Endangered.
+# Target  : Detect gharials (typically basking on sandbanks / river edges).
+# Source  : No verified gharial YOLO dataset or pretrained weights were found.
+#           Related work: UAV imagery + CNN re-identification for mugger
+#           crocodiles; synthetic-aerial-image YOLO training for crocodiles.
+#           See docs/indian_biodiversity.md. Collect and annotate imagery.
+# Licence : Record the source licence here once chosen.
+# Status  : NEEDS DATA + TRAINING. No pretrained weights are integrated.
+#
+# Layout expected under ``path`` (standard Ultralytics YOLO):
+#   images/train  images/val  images/test
+#   labels/train  labels/val  labels/test
+#
+# Run from the project root, e.g.:
+#   python scripts/train.py --data training/datasets/gharial.yaml \
+#       --model yolov8n.pt --epochs 100 --imgsz 640 --batch 16
+# ---------------------------------------------------------------------------
+
+path: data/raw/gharial
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: gharial

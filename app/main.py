@@ -31,7 +31,7 @@ from typing import Optional, Sequence
 
 from app import __version__
 from app.config import get_settings, setup_logging
-from app.detection.detector import MarineDetector, MODEL_SELECTIONS
+from app.detection.detector import MarineDetector
 from app.detection.model_manager import ModelError, download_progress_printer
 from app.processing.enhancement import EnhancementConfig
 from app.processing.image_processor import ImageProcessor, ProcessingError
@@ -67,9 +67,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--model",
-        choices=MODEL_SELECTIONS,
         default=None,
-        help="Model selection: 'auto' runs every available model (combined).",
+        help="Model selection: 'auto' (default) runs every available model and "
+        "merges the results. You can also pass the id of any registered model "
+        "(e.g. fish_inv, megafauna, or a custom / regional model id). "
+        "Run --list-models to see the available ids.",
     )
     parser.add_argument(
         "--enhance",

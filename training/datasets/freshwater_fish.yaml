@@ -1,0 +1,35 @@
+# BlueEye dataset config - Freshwater fish detection
+# ---------------------------------------------------------------------------
+# Habitat : Freshwater - Karnataka and South Indian rivers, lakes, ponds and
+#           reservoirs (the DePondFi recordings come from aquaculture ponds in
+#           Tamil Nadu).
+# Target  : Detect and count freshwater fish. Classes are limited to what the
+#           chosen annotated dataset actually provides - never invent species.
+# Source  : DePondFi / "Annotated underwater fish detection dataset from pond
+#           environments" - Orange Chromide (Etroplus maculatus), 586 images,
+#           10,607 instances, 1 class ("fish").
+#           https://data.mendeley.com/datasets/7w45jx35hd/1
+#           https://doi.org/10.1016/j.dib.2024.111007
+# Licence : Dataset CC BY 4.0 (Mendeley); article CC BY-NC 4.0. Check the
+#           licence again before redistributing any derived weights.
+# Status  : NO verified pretrained YOLOv8 weights for Indian freshwater fish
+#           are publicly available, so this model must be TRAINED locally.
+#           (AquaYOLO reports `aquayolo*.pt`, but no trustworthy public
+#           download was found - see docs/indian_biodiversity.md.)
+#
+# Layout expected under ``path`` (standard Ultralytics YOLO):
+#   images/train  images/val  images/test
+#   labels/train  labels/val  labels/test
+#
+# Run from the project root, e.g.:
+#   python scripts/train.py --data training/datasets/freshwater_fish.yaml \
+#       --model yolov8n.pt --epochs 100 --imgsz 640 --batch 16
+# ---------------------------------------------------------------------------
+
+path: data/raw/freshwater_fish
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: fish

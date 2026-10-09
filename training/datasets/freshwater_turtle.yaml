@@ -1,0 +1,35 @@
+# BlueEye dataset config - Freshwater turtle detection
+# ---------------------------------------------------------------------------
+# Habitat : Freshwater - Indian rivers, lakes and ponds. Typical taxa include
+#           the Indian roofed turtle (Pangshura tecta), Indian softshell
+#           (Nilssonia gangetica) and Indian flapshell (Lissemys punctata).
+# Target  : Detect freshwater turtles. Only add species names to ``names``
+#           once they are actually present and annotated in your dataset.
+# Source  : No verified freshwater-turtle YOLO dataset with a clear licence
+#           was found. The upstream MegaFauna model detects a generic
+#           "turtle" class (sea/turtle, not freshwater-specific). Collect and
+#           annotate representative footage, or curate an existing licensed
+#           set (see docs/indian_biodiversity.md).
+# Licence : Record the source licence here once chosen.
+# Status  : NEEDS DATA + TRAINING. No pretrained weights are integrated.
+#
+# Note    : The built-in MegaFauna model already emits a generic ``turtle``
+#           class. Use a dedicated model like this when you need freshwater
+#           specificity and a measurable metric on local footage.
+#
+# Layout expected under ``path`` (standard Ultralytics YOLO):
+#   images/train  images/val  images/test
+#   labels/train  labels/val  labels/test
+#
+# Run from the project root, e.g.:
+#   python scripts/train.py --data training/datasets/freshwater_turtle.yaml \
+#       --model models/fish_inv/FishInv.pt --epochs 100 --imgsz 640 --batch 16
+# ---------------------------------------------------------------------------
+
+path: data/raw/freshwater_turtle
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: freshwater_turtle

@@ -31,6 +31,8 @@ REPORT_DATASETS: tuple[tuple[str, str], ...] = (
     ("Fish dataset", "https://universe.roboflow.com/roboflow-gw7yv/fish-yzfml"),
     ("Count-a-manta dataset", "https://universe.roboflow.com/le-wagon-w02yl/count-a-manta"),
     ("Oz Fish dataset (AIMS/UWA/Curtin)", "https://doi.org/10.25845/5e28f062c5097"),
+    ("DePondFi / Orange Chromide dataset (CC BY 4.0)", "https://data.mendeley.com/datasets/7w45jx35hd/1"),
+    ("Underwater Species Dataset NR (CC BY 4.0)", "https://data.mendeley.com/datasets/4tp83br92z/1"),
 )
 
 

@@ -50,6 +50,8 @@ names:
 
 | Dataset | Source |
 | --- | --- |
+| DePondFi / Orange Chromide (freshwater pond fish, CC BY 4.0) | https://data.mendeley.com/datasets/7w45jx35hd/1 |
+| Underwater Species Dataset NR (7 marine classes incl. octopus, CC BY 4.0) | https://data.mendeley.com/datasets/4tp83br92z/1 |
 | Shark Dataset | https://universe.roboflow.com/ticon-dataset/shark-ibmby |
 | Shark Species | https://universe.roboflow.com/rizal-fadia-al-fikri/shark_species |
 | Zebra Shark | https://universe.roboflow.com/minhajul-arefin/zebra_shark |
@@ -60,6 +62,11 @@ names:
 The upstream *marine-detect* project also publishes two annotated YOLO
 datasets (FishInv, MegaFauna) - see the links in the upstream README:
 https://github.com/Orange-OpenSource/marine-detect
+
+For the Indian freshwater / coastal focus, ready-to-edit dataset configs live
+in [`training/`](../training/README.md) and the researched sources with their
+licences are documented in
+[`docs/indian_biodiversity.md`](../docs/indian_biodiversity.md).
 
 **None of these datasets are downloaded automatically.** Fetch them
 yourself, convert them to the layout above, then train with:

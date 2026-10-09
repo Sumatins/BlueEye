@@ -1,20 +1,85 @@
 {
-  "_readme": "Copy this file to registry.json (same folder) and edit it. It is a template - nothing here is loaded until the weights file actually exists. Full documentation: models/custom/README.md and docs/regional_models.md.",
+  "_readme": "TEMPLATE ONLY. Copy this file to registry.json (same folder) and edit it. Nothing listed here is loaded or downloaded until the weights file actually exists on disk AND the entry is in registry.json. Full documentation: models/custom/README.md and docs/indian_biodiversity.md. BlueEye never fabricates weights - a model shows 'not installed' until you place its .pt file.",
   "models": [
     {
-      "id": "regional_karnataka",
-      "name": "Karnataka Coastal Species",
-      "weights": "regional/karnataka/BlueEyeRegional.pt",
-      "classes": ["tuna", "mackerel", "shark"],
+      "id": "freshwater_fish",
+      "name": "Freshwater Fish (India)",
+      "weights": "regional/freshwater_fish/BlueEyeFreshwaterFish.pt",
+      "classes": ["fish"],
       "type": "yolov8",
       "version": "0.1",
       "recommended_confidence": 0.5,
-      "source": "Trained in-house on a local dataset",
+      "source": "Trained in-house on DePondFi / Orange Chromide (CC BY 4.0)",
+      "license": "Dataset CC BY 4.0; model weights by us",
+      "category": "freshwater",
+      "icon": "set_meal",
+      "summary": "Freshwater pond/river fish for Karnataka and South India.",
+      "description": "YOLOv8 model for freshwater fish in Indian ponds, lakes and rivers.",
+      "homepage": "https://data.mendeley.com/datasets/7w45jx35hd/1"
+    },
+    {
+      "id": "gangetic_dolphin",
+      "name": "Gangetic River Dolphin",
+      "weights": "regional/gangetic_dolphin/BlueEyeGangeticDolphin.pt",
+      "classes": ["gangetic_river_dolphin"],
+      "type": "yolov8",
+      "version": "0.1",
+      "recommended_confidence": 0.5,
+      "source": "Trained in-house on a locally annotated river survey dataset",
       "license": "",
-      "category": "regional",
-      "icon": "🌊",
-      "summary": "Species recorded along the Karnataka coast.",
-      "description": "Custom YOLOv8 model trained for regional waters."
+      "category": "freshwater",
+      "icon": "water",
+      "summary": "Platanista gangetica in Ganga / Brahmaputra / Chambal rivers.",
+      "description": "YOLOv8 model for surfacing Gangetic river dolphins.",
+      "homepage": ""
+    },
+    {
+      "id": "freshwater_turtle",
+      "name": "Freshwater Turtle (India)",
+      "weights": "regional/freshwater_turtle/BlueEyeFreshwaterTurtle.pt",
+      "classes": ["freshwater_turtle"],
+      "type": "yolov8",
+      "version": "0.1",
+      "recommended_confidence": 0.5,
+      "source": "Trained in-house on a locally annotated dataset",
+      "license": "",
+      "category": "freshwater",
+      "icon": "pets",
+      "summary": "Freshwater turtles in Indian rivers, lakes and ponds.",
+      "description": "YOLOv8 model for freshwater turtles (roofed, softshell, flapshell).",
+      "homepage": ""
+    },
+    {
+      "id": "gharial",
+      "name": "Gharial",
+      "weights": "regional/gharial/BlueEyeGharial.pt",
+      "classes": ["gharial"],
+      "type": "yolov8",
+      "version": "0.1",
+      "recommended_confidence": 0.5,
+      "source": "Trained in-house on a locally annotated dataset",
+      "license": "",
+      "category": "freshwater",
+      "icon": "landscape",
+      "summary": "Gavialis gangeticus in clear, fast-flowing Indian rivers.",
+      "description": "YOLOv8 model for gharials, typically basking on river banks.",
+      "homepage": ""
+    },
+    {
+      "id": "indian_marine",
+      "name": "Indian Coastal Species",
+      "weights": "regional/indian_marine/BlueEyeIndianMarine.pt",
+      "classes": ["whale_shark", "octopus", "ray", "olive_ridley_turtle"],
+      "type": "yolov8",
+      "version": "0.1",
+      "recommended_confidence": 0.5,
+      "source": "Trained in-house on Underwater Species Dataset (NR), CC BY 4.0",
+      "license": "Dataset CC BY 4.0; model weights by us",
+      "category": "marine",
+      "icon": "water",
+      "summary": "Species-level coastal model for the Arabian Sea / Bay of Bengal.",
+      "description": "YOLOv8 model for whale shark, octopus, rays and Olive Ridley turtles.",
+      "homepage": "https://data.mendeley.com/datasets/4tp83br92z/1"
     },
     {
       "id": "blueeye_custom",
@@ -26,8 +91,9 @@
       "recommended_confidence": 0.5,
       "source": "User-provided",
       "category": "custom",
-      "icon": "🐟",
-      "summary": "Any YOLOv8 checkpoint you place under models/."
+      "icon": "psychology",
+      "summary": "Any YOLOv8 checkpoint you place under models/.",
+      "description": "Generic placeholder for any user-provided YOLOv8 model."
     }
   ]
 }

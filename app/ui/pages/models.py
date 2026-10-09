@@ -220,7 +220,9 @@ def _custom_section(detector: MarineDetector, registry: dict) -> None:
             "No regional model installed",
             "BlueEye supports regional / local species models, but none is "
             "installed. Support is ready for a custom model integration - "
-            "BlueEye does not claim a regional model exists when it does not.",
+            "BlueEye does not claim a regional model exists when it does not. "
+            "See docs/indian_biodiversity.md for the Indian freshwater / "
+            "coastal roadmap and which models still need training.",
         )
 
     with st.expander("How to add a regional or custom model", expanded=False):
@@ -260,6 +262,12 @@ Example entry:
 Registry file: `PROJECT_ROOT / """ + CUSTOM_REGISTRY_FILE + """.` Invalid entries are
 logged and skipped — a broken file never stops the built-in models from
 working.
+
+**Indian species** (freshwater fish, Gangetic river dolphin, freshwater turtle,
+gharial and coastal species): ready-to-edit dataset configs live in
+`training/datasets/`, and the verified datasets, licences and remaining gaps
+are documented in `docs/indian_biodiversity.md`. BlueEye ships **no** Indian
+weights — each model must be trained and evaluated before it is registered.
 """
         )
 

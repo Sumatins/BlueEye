@@ -1,0 +1,30 @@
+# BlueEye dataset config - Gangetic river dolphin detection
+# ---------------------------------------------------------------------------
+# Habitat : Freshwater - Ganga / Brahmaputra / Chambal river systems.
+#           Platanista gangetica (Gangetic river dolphin, National Aquatic
+#           Animal of India, Endangered).
+# Target  : Detect and count surfacing river dolphins.
+# Source  : No verified, licensed, ready-to-download detection dataset was
+#           found. Published work uses visual-acoustic surveys, UAV imagery
+#           and sonar (see docs/indian_biodiversity.md). The images have to be
+#           collected (river surveys / UAV / existing monitoring archives)
+#           and annotated in YOLO format.
+# Licence : N/A until you collect/obtain a dataset - record its licence here.
+# Status  : NEEDS DATA + TRAINING. No pretrained weights are integrated.
+#
+# Layout expected under ``path`` (standard Ultralytics YOLO):
+#   images/train  images/val  images/test
+#   labels/train  labels/val  labels/test
+#
+# Run from the project root, e.g.:
+#   python scripts/train.py --data training/datasets/gangetic_dolphin.yaml \
+#       --model yolov8n.pt --epochs 100 --imgsz 640 --batch 16
+# ---------------------------------------------------------------------------
+
+path: data/raw/gangetic_dolphin
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: gangetic_river_dolphin

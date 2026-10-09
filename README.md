@@ -48,6 +48,10 @@ dashboard with statistics and a machine-readable JSON report.
   labels (installed / not installed); new models (e.g. regional species) are added
   with a JSON entry + a `.pt` file, **no code changes** — see
   [`docs/regional_models.md`](docs/regional_models.md)
+- **Indian biodiversity roadmap** — dataset configs and a training pipeline for
+  freshwater fish, Gangetic river dolphin, freshwater turtle, gharial and
+  coastal species; the built-in MegaFauna already covers shark / ray / turtle
+  at group level — see [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md)
 - **Configurable confidence threshold** (slider, or one click for each model's
   recommended value)
 - **Optional underwater enhancement** — colour correction → CLAHE contrast →
@@ -181,6 +185,34 @@ or click **"Download model weights"** in the web UI sidebar.
 > marine-detect README and are excluded from version control (`models/*` is
 > git-ignored).
 
+## Indian Biodiversity Models
+
+BlueEye is being extended toward **Indian freshwater and coastal species**.
+The architecture already supports any registered model; what is (and is not)
+available is documented honestly:
+
+| Target | Habitat | Built-in coverage | Status |
+| --- | --- | --- | --- |
+| Freshwater fish | Freshwater ponds / rivers / reservoirs | — | **needs training** (DePondFi / Orange Chromide dataset, CC BY 4.0) |
+| Gangetic river dolphin | Ganga / Brahmaputra / Chambal | — | **needs data + training** |
+| Freshwater turtle | Indian rivers / lakes / ponds | generic `turtle` (MegaFauna) | **needs data + training** |
+| Gharial | clear, fast-flowing rivers | — | **needs data + training** |
+| Whale shark / rays / Olive Ridley | Arabian Sea / Bay of Bengal | generic `shark` / `ray` / `turtle` (MegaFauna) | group-level now; species-level needs training |
+| Octopus | Indian coastal waters | — | **needs training** |
+
+- **No Indian pretrained weights are shipped.** The public models that were
+  found (AquaYOLO, YOLO-Fish, Roboflow Universe projects) did not meet the bar
+  of a verifiable licence + known classes + YOLOv8 `.pt` + a trustworthy
+  download, so **none was integrated** — BlueEye does not fabricate a model.
+- **Verified, licensed datasets** (DePondFi / Orange Chromide and the
+  Underwater Species Dataset NR — both CC BY 4.0) are catalogued with their
+  licences in [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md).
+- **Ready-to-train configs** for each target are in
+  [`training/datasets/`](training/README.md): train with `scripts/train.py`,
+  evaluate with `scripts/evaluate.py`, then register the `.pt`.
+- **Freshwater and marine models are kept separate.** A model is only claimed
+  to work for the environment it was trained on.
+
 ## Running the Application
 
 ### Web UI (recommended for demonstrations)
@@ -281,6 +313,19 @@ python scripts/train.py --data data/processed/my_dataset/data.yaml \
     --model models/fish_inv/FishInv.pt --epochs 30
 ```
 
+For the **Indian-species** models, ready-made dataset configs ship in
+[`training/datasets/`](training/README.md):
+
+```bash
+python scripts/train.py \
+    --data training/datasets/freshwater_fish.yaml \
+    --model models/fish_inv/FishInv.pt --epochs 100 --imgsz 640 --batch 16
+```
+
+See [`training/README.md`](training/README.md) for the full per-target workflow
+and [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md) for datasets,
+licences and limitations.
+
 ### Evaluation (Precision / Recall / mAP)
 
 ```bash
@@ -302,7 +347,9 @@ python scripts/evaluate.py \
 See [`data/README.md`](data/README.md) for the expected YOLO layout,
 `data.yaml` example, directory structure and links to the marine datasets
 referenced in the BlueEye report (Shark, Shark Species, Zebra Shark, Fish,
-Count-a-Manta, OzFish, …). Datasets are never downloaded automatically.
+Count-a-Manta, OzFish, …). Ready-to-edit configs for the Indian-species
+models are in [`training/datasets/`](training/README.md). Datasets are never
+downloaded automatically.
 
 ## Configuration
 
@@ -330,6 +377,10 @@ Settings come from environment variables or an optional `.env` file
   roughly doubles inference time — choose a single model for speed-critical
   use.
 - **Fish & Invertebrates** / **MegaFauna** — run only that model.
+- **Any registered model** (built-in or a custom / regional one) can be
+  selected explicitly: pick it in Detect or pass its id to `--model`. If its
+  weights are missing, BlueEye shows a clear error and never disables the
+  other working models. Aliases (`fish`, `mega`) keep working.
 
 ### Adding a model (registry)
 
@@ -343,11 +394,13 @@ models/custom/registry.json┘
 
 To add your own model (for example a regional species model), drop a YOLOv8
 `.pt` under `models/` and describe it in `models/custom/registry.json` — see
-[`models/custom/README.md`](models/custom/README.md) for the schema and
-[`docs/regional_models.md`](docs/regional_models.md) for the full dataset →
-training → evaluation workflow. Invalid entries are logged and skipped, so a
-broken file never breaks the built-in models. **BlueEye does not ship or
-claim a regional model today** — the support is ready, the weights are not.
+[`models/custom/README.md`](models/custom/README.md) for the schema,
+[`training/README.md`](training/README.md) for the dataset → training →
+evaluation workflow, and [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md)
+for the Indian-species dataset research and licences. Invalid entries are
+logged and skipped, so a broken file never breaks the built-in models.
+**BlueEye does not ship or claim a regional / Indian model today** — the
+support is ready, the weights are not.
 
 ### Confidence threshold
 
@@ -468,8 +521,12 @@ blueeye/
 │   ├── download_models.py          # fetch official weights
 │   ├── train.py                    # training / fine-tuning
 │   └── evaluate.py                 # precision / recall / mAP evaluation
+├── training/
+│   ├── README.md                   # per-target training workflow
+│   └── datasets/                   # YOLO data.yaml configs (Indian species)
 ├── docs/
-│   └── regional_models.md          # regional model research + training workflow
+│   ├── regional_models.md          # regional model research + training workflow
+│   └── indian_biodiversity.md      # Indian-species datasets, licences, plan
 ├── models/                         # weights (downloaded, git-ignored)
 │   ├── fish_inv/FishInv.pt
 │   ├── megafauna/MegaFauna.pt
@@ -494,7 +551,10 @@ blueeye/
 
 - The two pretrained models cover the **upstream species scope** (reef fish
   families, five invertebrates, shark/ray/turtle) — other organisms will not
-  be detected until new data is trained in.
+  be detected until new data is trained in. In particular, no Indian
+  freshwater or species-level coastal model is shipped; MegaFauna only gives
+  the **group** `shark` / `ray` / `turtle`, and octopus is not covered at all
+  (see [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md)).
 - CPU inference is comparatively slow for long videos (roughly 0.5–2 fps
   depending on hardware); GPU is recommended for longer footage.
 - Underwater enhancement is a heuristic preprocessing step and is **not**
@@ -514,10 +574,11 @@ applications for wider access.
 
 **Regional models:** the architecture, registry, training scripts and
 documentation are ready (`docs/regional_models.md`,
-`models/custom/README.md`). The missing piece is real regional data — collect
-and label it, train with `scripts/train.py`, evaluate with
-`scripts/evaluate.py`, then register the weights. No regional model is
-shipped or claimed before that happens.
+[`docs/indian_biodiversity.md`](docs/indian_biodiversity.md),
+`models/custom/README.md`, [`training/`](training/README.md)). The missing
+piece is real regional data — collect and label it, train with
+`scripts/train.py`, evaluate with `scripts/evaluate.py`, then register the
+weights. No regional / Indian model is shipped or claimed before that happens.
 
 ## Credits & License
 

@@ -1,0 +1,45 @@
+# BlueEye dataset config - Indian coastal / marine species
+# ---------------------------------------------------------------------------
+# Habitat : Marine - Indian coastal waters (Arabian Sea, Bay of Bengal,
+#           Lakshadweep). This is the *future* coastal counterpart to the
+#           freshwater models.
+# Target  : Whale shark, octopus, marine rays and Olive Ridley sea turtle.
+#
+#           IMPORTANT - what the built-in models already cover:
+#             * whale shark  -> MegaFauna emits a generic ``shark`` class.
+#             * marine rays  -> MegaFauna emits a generic ``ray`` class.
+#             * Olive Ridley -> MegaFauna emits a generic ``turtle`` class.
+#             * octopus      -> NOT covered by FishInv or MegaFauna.
+#           The built-ins are genus/group level, not species specific, so a
+#           dedicated model is only worth training for species-level output
+#           and for octopus.
+#
+# Source  : "Underwater Species Dataset (NR)" - 1,728 images, 7 classes
+#           (seals, dolphins, sea turtles, octopus, seahorse, sharks,
+#           whales). https://data.mendeley.com/datasets/4tp83br92z/1
+#           Also: Community Fish Detection dataset (1 class "fish"),
+#           https://lila.science/datasets/community-fish-detection-dataset
+# Licence : Underwater Species Dataset CC BY 4.0 (Mendeley).
+# Status  : ARCHITECTURE PREPARED / NEEDS DATA + TRAINING. No pretrained
+#           weights are integrated. The generic classes above already work
+#           through the built-in MegaFauna model.
+#
+# Layout expected under ``path`` (standard Ultralytics YOLO):
+#   images/train  images/val  images/test
+#   labels/train  labels/val  labels/test
+#
+# Run from the project root, e.g.:
+#   python scripts/train.py --data training/datasets/indian_marine.yaml \
+#       --model models/megafauna/MegaFauna.pt --epochs 100 --imgsz 640 --batch 16
+# ---------------------------------------------------------------------------
+
+path: data/raw/indian_marine
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: whale_shark
+  1: octopus
+  2: ray
+  3: olive_ridley_turtle

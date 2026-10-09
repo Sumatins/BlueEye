@@ -32,7 +32,9 @@ from app.detection.results import Detection, DetectionResult
 
 logger = logging.getLogger(__name__)
 
-#: Valid values for the "model selection" parameter.
+#: Built-in shortcuts for the "model selection" parameter. Any key that is
+#: present in the registry (built-in *or* user-registered custom / regional
+#: model) is also accepted directly - see :meth:`MarineDetector.resolve_keys`.
 MODEL_SELECTIONS = ("auto", "fish_inv", "megafauna")
 
 #: Aliases accepted for convenience.
@@ -77,20 +79,44 @@ class MarineDetector:
     def device(self) -> str:
         return self.model_manager.device
 
-    def resolve_keys(self, model_selection: str | None = None) -> list[str]:
-        """Turn a selection (``auto`` / ``fish_inv`` / ``megafauna``) into
-        the list of model keys that will run.
+    def _registered_keys(self) -> list[str]:
+        """Every model key visible to the manager (built-in + custom)."""
+        registry = getattr(self.model_manager, "registry", None)
+        if callable(registry):
+            return list(registry().keys())
+        # Fallback for manager doubles that only implement the older interface.
+        from app.detection.model_manager import iter_specs
 
-        ``auto`` runs **every model whose weights are available**
-        (combined mode). Raises :class:`ModelNotAvailableError` when nothing
-        usable is selected or present.
+        return [spec.key for spec in iter_specs(self.model_manager)]
+
+    def resolve_keys(self, model_selection: str | None = None) -> list[str]:
+        """Turn a selection into the list of model keys that will run.
+
+        ``auto`` runs **every model whose weights are available** (combined
+        mode). In addition to the built-in shortcuts and their aliases
+        (``fish``/``mega``), **any key present in the registry** can be
+        selected explicitly - this is what lets a user-registered custom /
+        regional model (for example an Indian-biodiversity model) be run
+        directly from the UI, the CLI and the API.
+
+        Raises :class:`ModelNotAvailableError` when nothing usable is
+        selected or present.
         """
         selection = (model_selection or self.settings.default_model_selection or "auto")
-        normalized = _SELECTION_ALIASES.get(str(selection).strip().lower())
+        raw = str(selection).strip()
+
+        normalized = _SELECTION_ALIASES.get(raw.lower())
         if normalized is None:
+            # A registered model key is a valid explicit selection. Match
+            # case-insensitively so ``--model MegaFauna`` also works.
+            registered = {key.lower(): key for key in self._registered_keys()}
+            normalized = registered.get(raw.lower())
+
+        if normalized is None:
+            known = ", ".join(self._registered_keys()) or "none"
             raise ModelNotAvailableError(
                 f"Unknown model selection '{selection}'. "
-                f"Choose one of: {', '.join(MODEL_SELECTIONS)}."
+                f"Choose 'auto' or one of the registered models: {known}."
             )
 
         if normalized == "auto":
@@ -108,7 +134,9 @@ class MarineDetector:
             spec = self.model_manager.get_spec(normalized)
             raise ModelNotAvailableError(
                 f"Model weights for '{spec.display_name}' are not available "
-                f"locally. Run 'python scripts/download_models.py' to download them."
+                f"locally. Run 'python scripts/download_models.py' to download them "
+                f"(custom / regional weights must be placed under 'models/' - see "
+                f"models/custom/README.md)."
             )
         return [normalized]
 

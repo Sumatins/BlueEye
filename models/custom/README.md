@@ -4,6 +4,12 @@ This folder is BlueEye's **model extension point**. It lets you add new
 YOLOv8 models — for example one trained on *regional* species — **without
 touching any application code**.
 
+For the Indian-biodiversity roadmap (which models are integrated, which need
+training, dataset sources and licences) see
+[`docs/indian_biodiversity.md`](../../docs/indian_biodiversity.md); ready-to-edit
+dataset configs and the training workflow are in
+[`training/`](../../training/README.md).
+
 Nothing in this folder is downloaded automatically. BlueEye never fabricates
 weights: you place the `.pt` file yourself and describe it here.
 
@@ -12,7 +18,10 @@ weights: you place the `.pt` file yourself and describe it here.
 ## Add a model in 4 steps
 
 1. **Obtain or train** a YOLOv8 `.pt` checkpoint.
-   The full dataset → training → evaluation workflow is documented in
+   Ready-to-edit dataset configs for Indian species are in
+   [`training/datasets/`](../../training/datasets); the full dataset →
+   training → evaluation workflow is documented in
+   [`training/README.md`](../../training/README.md) and
    [`docs/regional_models.md`](../../docs/regional_models.md).
 2. **Copy the weights** anywhere under `models/`, e.g.
 
@@ -98,6 +107,12 @@ python -m app.main --image path/to/image.jpg --model regional_karnataka
 # Web UI
 python -m streamlit run app/ui/streamlit_app.py
 ```
+
+> **Indian-biodiversity templates.** `registry.json.example` also contains
+> ready-to-edit entries for the Indian models (`freshwater_fish`,
+> `gangetic_dolphin`, `freshwater_turtle`, `gharial`, `indian_marine`). See
+> [`docs/indian_biodiversity.md`](../../docs/indian_biodiversity.md) for what
+> each one needs before it can run.
 
 ## Honesty policy
 

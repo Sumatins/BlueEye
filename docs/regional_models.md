@@ -18,6 +18,7 @@ application code**. This document records:
 | Registry / architecture able to load a regional model | ✅ Ready (`models/custom/registry.json`) |
 | Training + evaluation scripts | ✅ Ready (`scripts/train.py`, `scripts/evaluate.py`) |
 | Documentation for the full workflow | ✅ This file |
+| Indian-biodiversity dataset configs | ✅ Ready (`training/datasets/`) — see [`docs/indian_biodiversity.md`](indian_biodiversity.md) |
 | A trained India / Karnataka / Arabian Sea model **inside BlueEye** | ❌ **Does not exist** |
 
 BlueEye does **not** claim any model is trained for India or any specific
@@ -46,6 +47,11 @@ benchmark-tested or integrated by BlueEye, and their class lists and licences
 were **not** fully verified here. Treat every entry as "to be evaluated".
 
 ### Public datasets worth evaluating
+
+For the Indian-freshwater / coastal focus, the datasets with a **verified
+licence** are catalogued in [`docs/indian_biodiversity.md`](indian_biodiversity.md)
+(DePondFi / Orange Chromide and the Underwater Species Dataset, both CC BY 4.0).
+The broader candidate list below is marine/general.
 
 | Candidate | Where | Notes |
 |---|---|---|
