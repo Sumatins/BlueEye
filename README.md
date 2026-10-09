@@ -32,14 +32,21 @@ dashboard with statistics and a machine-readable JSON report.
 ## Features
 
 - **Aquatic-biodiversity dashboard** — a branded hero with real *Detect an
-  Image* / *Analyse a Video* actions, a "How BlueEye works" explainer, an
-  observation overview, recent detections and capability cards, all driven by
-  the real history store (never hard-coded numbers, no model loading on load)
+  Image* / *Analyse a Video* actions, an "Explore BlueEye" launcher, a
+  "How BlueEye works" explainer, a capabilities section and a responsible-use
+  note, all driven by real navigation (no invented metrics, no model loading
+  on load)
 - **Professional multi-page web UI** — Dashboard, Detect Image, Detect Video,
-  Models, Analytics, History and About, with a compact grouped sidebar, one
-  consistent icon set (Material Symbols Rounded), a deep-ocean design system,
-  real metadata cards, status badges, honest empty states, loading states,
-  friendly error cards and a responsive layout
+  Species Explorer, Models, Analytics, History and About, with a compact
+  grouped sidebar, one consistent icon set (Material Symbols Rounded), a
+  deep-ocean design system, real metadata cards, status badges, honest empty
+  states, loading states, friendly error cards and a responsive layout
+- **Species Explorer** — an educational reference library of 38 aquatic
+  species (Indian freshwater and coastal species first), with search by
+  common/scientific name, habitat and group filters, a detail view, and an
+  honest per-species "can BlueEye detect this?" note (direct class support /
+  broad-category only / not currently supported) — see
+  [`app/content/species.py`](app/content/species.py)
 - **Image detection** — upload JPG/JPEG/PNG/WEBP, get an annotated image back
   in a before/after view
 - **Video detection** — frame-by-frame processing of MP4/AVI/MOV/MKV into an
@@ -49,17 +56,21 @@ dashboard with statistics and a machine-readable JSON report.
   species label and confidence percentage, shown as cards and a table
 - **Two original pretrained models** — *Fish & Invertebrates* (15 classes) and
   *MegaFauna* (shark / ray / turtle), selectable or combined (`Auto`)
-- **Additional pretrained models** — three verified, opt-in aquatic models
-  (brackish/estuarine, aquarium & reef, grayscale underwater fish); `Auto`
-  keeps running only the two core models, `Every installed model` runs them all
+- **Additional pretrained models** — six verified, opt-in aquatic models
+  (brackish/estuarine, aquarium & reef, grayscale underwater fish, 21-species
+  Mediterranean, Community Fish, Fishial); `Auto` keeps running only the two
+  core models, `Every installed model` runs them all
 - **Extensible model registry** — friendly model cards with real status
   labels (installed / not installed); new models (e.g. regional species) are added
   with a JSON entry + a `.pt` file, **no code changes** — see
   [`docs/regional_models.md`](docs/regional_models.md)
 - **Indian biodiversity roadmap** — dataset configs and a training pipeline for
   freshwater fish, Gangetic river dolphin, freshwater turtle, gharial and
-  coastal species; the built-in MegaFauna already covers shark / ray / turtle
-  at group level — see [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md)
+  coastal species; these are **inactive research targets** (kept in
+  `models/custom/inactive_models.json`, never offered in the model selector
+  until real weights exist) — the built-in MegaFauna already covers
+  shark / ray / turtle at group level — see
+  [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md)
 - **Configurable confidence threshold** (slider, or one click for each model's
   recommended value)
 - **Optional underwater enhancement** — colour correction → CLAHE contrast →
@@ -195,7 +206,7 @@ or click **"Download model weights"** in the web UI sidebar.
 
 ### Additional (verified) aquatic models
 
-BlueEye can also run three **genuinely pretrained, publicly downloadable**
+BlueEye can also run six **genuinely pretrained, publicly downloadable**
 aquatic detectors. They are optional and **opt-in** — `auto` still runs only
 the two core models. Fetch them (SHA-256-pinned) with:
 
@@ -208,13 +219,17 @@ python scripts/fetch_additional_models.py
 | `aquatic_brackish` | crab, fish, jellyfish, shrimp, small_fish, starfish | YOLOv8s | AGPL-3.0 | [dronefreak/brackish-yolov8s](https://huggingface.co/dronefreak/brackish-yolov8s) |
 | `aquarium_marine` | fish, jellyfish, penguin, puffin, shark, starfish, stingray | RT-DETR | AGPL-3.0 | [Kanagavel/aquarium-rtdetr](https://huggingface.co/Kanagavel/aquarium-rtdetr) |
 | `underwater_fish` | fish | YOLOv8n | US Gov. work (royalty-free) | [akridge/yolo8-fish-detector-grayscale](https://huggingface.co/akridge/yolo8-fish-detector-grayscale) |
+| `obsea_mediterranean` | 21 Mediterranean species (groupers, seabreams, wrasse, moray, Myliobatidae) | YOLOv8x | CC-BY-4.0 | [OBSEA / Zenodo 14910365](https://zenodo.org/records/14910365) |
+| `community_fish` | fish | YOLOv12x | AGPL-3.0 | [filippovarini/community-fish-detector](https://github.com/filippovarini/community-fish-detector) |
+| `fishial_detector` | Fish | YOLO26n | MIT | [fishial/fish-identification](https://github.com/fishial/fish-identification) |
 
 They are **not India-specific**; provenance limits are documented in
 [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md). They appear in
-the **Models** page under *"Additional pretrained models"*, and
+the **Models** page under *"Ready and verified"* once installed, and
 you can run them with `--model <key>` or the combined `--model all`. A
-candidate published only as Axera NPU files (`aquarium_axera`) is shown as
-**Incompatible**. Verify every model with a real inference test:
+candidate published only as Axera NPU files (`aquarium_axera`) is preserved in
+the inactive registry as **Incompatible**. Verify every model with a real
+inference test:
 
 ```bash
 python -m app.main --verify-models
@@ -229,12 +244,19 @@ available is documented honestly:
 
 | Target | Habitat | Built-in coverage | Status |
 | --- | --- | --- | --- |
-| Freshwater fish | Freshwater ponds / rivers / reservoirs | — | **needs training** (DePondFi / Orange Chromide dataset, CC BY 4.0 — files not publicly downloadable as of Oct 2026) |
-| Gangetic river dolphin | Ganga / Brahmaputra / Chambal | — | **needs data + training** |
-| Freshwater turtle | Indian rivers / lakes / ponds | generic `turtle` (MegaFauna) | **needs data + training** |
-| Gharial | clear, fast-flowing rivers | — | **needs data + training** |
-| Whale shark / rays / Olive Ridley | Arabian Sea / Bay of Bengal | generic `shark` / `ray` / `turtle` (MegaFauna) | group-level now; species-level needs training |
-| Octopus | Indian coastal waters | — | **needs training** (NR archive ships images only, no labels) |
+| Freshwater fish | Freshwater ponds / rivers / reservoirs | — | **inactive — needs training** (DePondFi / Orange Chromide dataset, CC BY 4.0 — files not publicly downloadable as of Oct 2026) |
+| Gangetic river dolphin | Ganga / Brahmaputra / Chambal | — | **inactive — needs data + training** |
+| Freshwater turtle | Indian rivers / lakes / ponds | generic `turtle` (MegaFauna) | **inactive — needs data + training** |
+| Gharial | clear, fast-flowing rivers | — | **inactive — needs data + training** |
+| Whale shark / rays / Olive Ridley | Arabian Sea / Bay of Bengal | generic `shark` / `ray` / `turtle` (MegaFauna) | group-level now; species-level inactive |
+| Octopus | Indian coastal waters | — | **inactive — needs training** (NR archive ships images only, no labels) |
+
+> These targets are **not in the active model registry**. Because none has
+> verified weights, all of them (plus the incompatible Axera export) live in
+> [`models/custom/inactive_models.json`](models/custom/inactive_models.json),
+> which is documentation only — they never appear in the model selector or in
+> model counts. An entry becomes selectable only after a real, evaluated `.pt`
+> is registered in `models/custom/registry.json`.
 
 - **No Indian-species pretrained weights were found.** The public models that
   were found (AquaYOLO, YOLO-Fish, Roboflow Universe projects) did not meet the
@@ -251,7 +273,8 @@ available is documented honestly:
   [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md) §3.1. As of
   October 2026 neither can be trained on as-is (DePondFi files are not served
   to anonymous users; the NR archive contains images without label files), so
-  the five Indian targets stay **NEEDS TRAINING** rather than being faked.
+  the five Indian targets stay **inactive** (needs training) rather than being
+  faked.
 - **Ready-to-train configs** for each target are in
   [`training/datasets/`](training/README.md). Validate and lay out a downloaded
   dataset with `scripts/prepare_dataset.py` (it refuses unlabelled data), train
@@ -272,16 +295,17 @@ Open http://localhost:8501 and use the sidebar navigation:
 
 | Page | What it does |
 | --- | --- |
-| **Dashboard** | Aquatic-biodiversity landing page: branding hero, real *Detect an Image* / *Analyse a Video* actions, "How BlueEye works", observation overview, recent detections, capability cards and a responsible-use note |
+| **Dashboard** | Aquatic-biodiversity landing page: branding hero, real *Detect an Image* / *Analyse a Video* actions, an "Explore BlueEye" launcher, "How BlueEye works", capabilities and a responsible-use note |
 | **Detect Image** | The detection workflow with the media type set to **Image**: upload → choose model → set confidence → **Detect** → results |
 | **Detect Video** | The same workflow with the media type set to **Video**, with a real frame-by-frame progress bar |
-| **Models** | The single source of truth: original / additional pretrained / locally trained / needs-training / incompatible models, readiness + habitat filters, real status and an inference check; download weights |
+| **Species Explorer** | An educational reference library of aquatic species with search and habitat/group filters, a detail view, and an honest per-species note on whether any active model can detect it |
+| **Models** | The single source of truth: grouped into *Ready and verified* / *Downloadable but not yet verified* / *Unavailable or incompatible*, with architecture, runtime, classes, licence, image/video verification, limitations and an inference check; download weights |
 | **Analytics** | Charts computed from your stored detections (top species, confidence distribution) |
 | **History** | Every finished run with inputs, models, thresholds and outputs; export/clear |
 | **About** | What BlueEye does, how it works, limitations and attribution |
 
-The sidebar groups the pages (*Overview* / *AI and data* / *Activity* /
-*Information*) and shows only a compact readiness indicator — **no individual
+The sidebar groups the pages (*Overview* / *Detection* / *Explore* / *Activity*
+/ *Information*) and shows only a compact readiness indicator — **no individual
 model names or per-model badges**; the Models page is the single source of
 truth for model status. Hardware/device details live on the Models and About
 pages. A single icon set — **Material Symbols Rounded**, bundled locally with

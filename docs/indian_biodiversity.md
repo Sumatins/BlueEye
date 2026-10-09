@@ -31,6 +31,17 @@ Class names are read from the weights at runtime (`ModelManager.get_class_names`
 the lists above are only a convenience copy. Recommended thresholds: 0.523
 (FishInv) and 0.546 (MegaFauna), as published upstream.
 
+> **Registry status (October 2026).** The **active** registry holds five working
+> detectors: the two core models above plus the three verified additional
+> models in [§2.2](#22-pretrained-aquatic-models-that-were-integrated-verified).
+> The six entries that cannot run today (`freshwater_fish`,
+> `gangetic_dolphin`, `freshwater_turtle`, `gharial`, `indian_marine`,
+> `aquarium_axera`) were moved to
+> [`models/custom/inactive_models.json`](../models/custom/inactive_models.json).
+> That file is **documentation only** — it is never loaded, nothing from it
+> appears in a selector or count, and its provenance is kept so an entry can be
+> reactivated once real weights exist.
+
 ### 1.1 What MegaFauna already covers for the "future marine" targets
 
 The task asks to check whether MegaFauna already detects the Indian marine
@@ -88,17 +99,20 @@ This is deliberate: a fake "India model" would be worse than none.
 ### 2.2 Pretrained aquatic models that *were* integrated (verified)
 
 Because the Indian-species models above could not be verified, BlueEye was
-extended with **three genuinely pretrained, publicly downloadable aquatic
+extended with **six genuinely pretrained, publicly downloadable aquatic
 detectors** instead. Each was downloaded, loaded with Ultralytics and run on
 a real image before being registered; none is India-specific, and each is
 clearly documented as such. They are **opt-in** (`"auto": false`): `auto`
 still runs only the two core models, so existing behaviour is unchanged.
 
-| id | Classes | Architecture | Licence | Source (Hugging Face) | Status |
+| id | Classes | Architecture | Licence | Source | Status |
 |---|---|---|---|---|---|
 | `aquatic_brackish` | `crab`, `fish`, `jellyfish`, `shrimp`, `small_fish`, `starfish` | YOLOv8s | AGPL-3.0 | [dronefreak/brackish-yolov8s](https://huggingface.co/dronefreak/brackish-yolov8s) | **READY** |
 | `aquarium_marine` | `fish`, `jellyfish`, `penguin`, `puffin`, `shark`, `starfish`, `stingray` | RT-DETR | AGPL-3.0 | [Kanagavel/aquarium-rtdetr](https://huggingface.co/Kanagavel/aquarium-rtdetr) | **READY** |
 | `underwater_fish` | `fish` | YOLOv8n | US Gov. work (public domain / royalty-free) | [akridge/yolo8-fish-detector-grayscale](https://huggingface.co/akridge/yolo8-fish-detector-grayscale) | **READY** |
+| `obsea_mediterranean` | 21 Mediterranean species (groupers, seabreams, wrasse, moray, Myliobatidae, …) | YOLOv8x | CC-BY-4.0 | [OBSEA / Zenodo 14910365](https://zenodo.org/records/14910365) | **READY** |
+| `community_fish` | `fish` | YOLOv12x | AGPL-3.0 | [filippovarini/community-fish-detector](https://github.com/filippovarini/community-fish-detector) | **READY** |
+| `fishial_detector` | `Fish` | YOLO26n | MIT | [fishial/fish-identification](https://github.com/fishial/fish-identification) | **READY** |
 
 Notes and provenance limits:
 
@@ -108,6 +122,12 @@ Notes and provenance limits:
   the weights load and detect, but no evaluation numbers are claimed.
 - `underwater_fish` is trained on **grayscale** underwater footage and may
   under-detect on colour images.
+- `obsea_mediterranean` is the only **species-level** model here, but its 21
+  classes are **Mediterranean** reef species, not Indian ones.
+- `community_fish` (YOLOv12x) and `fishial_detector` (YOLO26n) each emit a
+  single **generic** `fish`/`Fish` class — they are strong fish detectors but
+  do **not** identify a species, so they must never be shown as a species
+  detection.
 
 Fetch them (SHA-256-pinned) with:
 
@@ -122,9 +142,10 @@ every model — core and additional — with:
 python -m app.main --verify-models
 ```
 
-A fourth candidate, **AXERA-TECH/YOLOv8-Aquarium**, is registered as
-`aquarium_axera` with status **INCOMPATIBLE**: only Axera NPU (`.axmodel`)
-exports are published, so it cannot run through the Ultralytics pipeline.
+A fourth candidate, **AXERA-TECH/YOLOv8-Aquarium**, is kept in the inactive
+registry as `aquarium_axera` with status **INCOMPATIBLE**: only Axera NPU
+(`.axmodel`) exports are published, so it cannot run through the Ultralytics
+pipeline. It is not registered as an active model.
 
 ---
 
@@ -220,11 +241,12 @@ applied outside the water body it was built for:
 | `aquatic_brackish` | **Brackish / estuarine** | Estuaries and backwaters (trained on a Danish brackish site) |
 | `aquarium_marine` | Marine | Reef / aquarium footage (fish, shark, stingray, jellyfish, …) |
 | `underwater_fish` | Underwater | Grayscale camera footage (single `fish` class) |
-| `freshwater_fish` | **Freshwater** | Karnataka & South Indian ponds, lakes, rivers, reservoirs |
-| `gangetic_dolphin` | **Freshwater** | Ganga / Brahmaputra / Chambal river systems |
-| `freshwater_turtle` | **Freshwater** | Indian rivers, lakes, ponds |
-| `gharial` | **Freshwater** | Clear, fast-flowing Indian rivers |
-| `indian_marine` | **Marine** | Arabian Sea / Bay of Bengal coastal waters |
+
+**Inactive target ids** (not registered; preserved in
+`models/custom/inactive_models.json`): `freshwater_fish`, `gangetic_dolphin`,
+`freshwater_turtle`, `gharial` (all intended for **freshwater**) and
+`indian_marine` (intended for the **Arabian Sea / Bay of Bengal**). Because
+none has verified weights, none is offered in the model selector.
 
 Not every animal is present in every water body — a freshwater model should
 not be expected to work on reef footage, and vice versa.
@@ -254,8 +276,9 @@ python scripts/evaluate.py \
 Metrics reported: **precision, recall, mAP@50, mAP@50:0.95** (from
 Ultralytics `model.val`). Split **by sequence, not by frame**, to avoid
 inflated scores. Register the finished model in
-`models/custom/registry.json`; templates for the Indian models are in
-`models/custom/registry.json.example`.
+`models/custom/registry.json`; a generic template is in
+`models/custom/registry.json.example`, and the untrained Indian targets (with
+their blockers) are preserved in `models/custom/inactive_models.json`.
 
 Because underwater imagery differs strongly from ordinary photographs,
 **evaluate on representative underwater footage** whenever possible.
@@ -275,7 +298,8 @@ Because underwater imagery differs strongly from ordinary photographs,
 - **Neither candidate dataset is downloadable as labelled training data today**
   (see §3.1): DePondFi's files are not served to anonymous users, and the NR
   archive ships images without annotations. This — not a lack of code — is why
-  `freshwater_fish` and `indian_marine` remain **NEEDS TRAINING**.
+  `freshwater_fish` and `indian_marine` remain untrained and are kept as
+  **inactive** research entries rather than active models.
 - **Compute:** the environment this was verified in has **no CUDA GPU** (8 CPU
   cores, ~7.7 GB RAM, `torch … +cpu`). Even with annotations, five 100-epoch
   runs would be impractical here; a GPU (or a reduced schedule documented in

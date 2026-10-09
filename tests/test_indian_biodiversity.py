@@ -171,14 +171,24 @@ def test_indian_marine_config_includes_octopus_and_ray() -> None:
     assert {"octopus", "ray", "whale_shark", "olive_ridley_turtle"} <= classes
 
 
-def test_registry_example_parses_and_covers_indian_models() -> None:
+def test_registry_example_is_a_generic_template() -> None:
     example = PROJECT_ROOT / "models" / "custom" / "registry.json.example"
     payload = json.loads(example.read_text(encoding="utf-8"))
     ids = {entry["id"] for entry in payload["models"]}
+    # The shipped example is now a generic template (not the Indian targets).
+    assert {"blueeye_custom", "regional_example"} <= ids
+
+    inactive = json.loads(
+        (PROJECT_ROOT / "models" / "custom" / "inactive_models.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    inactive_ids = {entry["id"] for entry in inactive["models"]}
+    # The Indian research targets are preserved in the inactive registry.
     assert {
         "freshwater_fish",
         "gangetic_dolphin",
         "freshwater_turtle",
         "gharial",
         "indian_marine",
-    } <= ids
+    } <= inactive_ids

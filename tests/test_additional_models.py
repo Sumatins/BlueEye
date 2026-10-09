@@ -220,38 +220,68 @@ def test_suppress_duplicates_ignores_same_model_boxes() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Shipped registry file
+# Shipped registry files
 # --------------------------------------------------------------------------- #
+INACTIVE_FILE = PROJECT_ROOT / "models" / "custom" / "inactive_models.json"
+
+#: Entries moved out of the active registry because they cannot run today.
+REMOVED_IDS = (
+    "freshwater_fish",
+    "gangetic_dolphin",
+    "freshwater_turtle",
+    "gharial",
+    "indian_marine",
+    "aquarium_axera",
+)
+
+
 def _registry_entries() -> dict[str, dict]:
     payload = json.loads(REGISTRY_FILE.read_text(encoding="utf-8"))
     return {entry["id"]: entry for entry in payload["models"]}
 
 
-def test_shipped_registry_lists_verified_models() -> None:
+#: Every model the active registry is expected to contain.
+EXPECTED_CUSTOM = {
+    "aquatic_brackish",
+    "underwater_fish",
+    "aquarium_marine",
+    "obsea_mediterranean",
+    "community_fish",
+    "fishial_detector",
+}
+
+
+def test_shipped_registry_lists_only_verified_models() -> None:
     entries = _registry_entries()
-    assert {"aquatic_brackish", "underwater_fish", "aquarium_marine"} <= set(entries)
-    for key in ("aquatic_brackish", "underwater_fish", "aquarium_marine"):
+    assert EXPECTED_CUSTOM <= set(entries)
+    for key in EXPECTED_CUSTOM:
         assert entries[key]["category"] == "additional"
         assert entries[key]["auto"] is False
         assert not entries[key].get("readiness")  # derived -> ready when present
+        assert entries[key]["download_url"].startswith("https://")
+        assert len(entries[key]["sha256"]) == 64
 
 
-def test_shipped_registry_lists_indian_targets_as_needing_training() -> None:
+def test_removed_models_are_not_in_the_active_registry() -> None:
     entries = _registry_entries()
-    for key in (
-        "freshwater_fish",
-        "gangetic_dolphin",
-        "freshwater_turtle",
-        "gharial",
-        "indian_marine",
-    ):
-        assert entries[key]["category"] == "indian"
-        assert entries[key]["readiness"] == "needs_training"
+    for key in REMOVED_IDS:
+        assert key not in entries, f"{key} must not be in the active registry"
 
 
-def test_shipped_registry_documents_incompatible_model() -> None:
-    entries = _registry_entries()
-    assert entries["aquarium_axera"]["readiness"] == "incompatible"
+def test_removed_models_are_preserved_in_inactive_research_registry() -> None:
+    payload = json.loads(INACTIVE_FILE.read_text(encoding="utf-8"))
+    by_id = {entry["id"]: entry for entry in payload["models"]}
+    for key in REMOVED_IDS:
+        assert key in by_id, f"{key} must be preserved in inactive_models.json"
+    assert by_id["aquarium_axera"]["readiness"] == "incompatible"
+    assert by_id["freshwater_fish"]["readiness"] == "needs_training"
+    assert by_id["indian_marine"]["homepage"]  # provenance kept
+
+
+def test_loader_loads_only_the_active_registry() -> None:
+    """inactive_models.json is documentation - it must never be loaded."""
+    specs = load_custom_specs(PROJECT_ROOT / "models")
+    assert set(specs) == EXPECTED_CUSTOM
 
 
 def test_shipped_registry_parses_through_the_loader() -> None:
@@ -267,17 +297,11 @@ def test_shipped_registry_parses_through_the_loader() -> None:
         )
         specs = load_custom_specs(models_dir)
 
-    expected = {
-        "aquatic_brackish",
-        "underwater_fish",
-        "aquarium_marine",
-        "freshwater_fish",
-        "gangetic_dolphin",
-        "freshwater_turtle",
-        "gharial",
-        "indian_marine",
-        "aquarium_axera",
-    }
-    assert expected <= set(specs)
+    assert set(specs) == EXPECTED_CUSTOM
     assert specs["aquarium_marine"].loader == "rtdetr"
-    assert specs["aquarium_axera"].readiness_status(False) == "incompatible"
+    assert specs["aquatic_brackish"].sha256
+    assert specs["aquatic_brackish"].is_downloadable
+    # The Fishial checkpoint is distributed inside a zip; the loader keeps the
+    # member name so the downloader can extract and hash it.
+    assert specs["fishial_detector"].archive_member == "model.pt"
+    assert specs["fishial_detector"].is_downloadable

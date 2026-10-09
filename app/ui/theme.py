@@ -30,6 +30,7 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("dashboard", "Dashboard", "home"),
     ("detect_image", "Detect Image", "image"),
     ("detect_video", "Detect Video", "videocam"),
+    ("species", "Species Explorer", "menu_book"),
     ("models", "Models", "psychology"),
     ("analytics", "Analytics", "bar_chart"),
     ("history", "History", "history"),
@@ -39,8 +40,9 @@ PAGES: tuple[tuple[str, str, str], ...] = (
 #: Sidebar section grouping: (section title, page ids in display order).
 #: The ids must match :data:`PAGES`; section headers are rendered by CSS.
 NAV_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Overview", ("dashboard", "detect_image", "detect_video")),
-    ("AI and data", ("models", "analytics")),
+    ("Overview", ("dashboard",)),
+    ("Detection", ("detect_image", "detect_video")),
+    ("Explore", ("species", "models", "analytics")),
     ("Activity", ("history",)),
     ("Information", ("about",)),
 )

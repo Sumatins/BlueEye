@@ -10,8 +10,11 @@ training, dataset sources and licences) see
 dataset configs and the training workflow are in
 [`training/`](../../training/README.md).
 
-Nothing in this folder is downloaded automatically. BlueEye never fabricates
-weights: you place the `.pt` file yourself and describe it here.
+BlueEye never fabricates weights: you place the `.pt` file yourself and
+describe it here, or give a direct `download_url` + `sha256` and BlueEye can
+fetch it on demand from the Models page. Entries that cannot run today (no
+weights, or an unsupported format) live in `inactive_models.json` and are
+never loaded.
 
 ---
 
@@ -68,6 +71,12 @@ weights: you place the `.pt` file yourself and describe it here.
 | `habitat` | | string | e.g. `"Freshwater"`, `"Brackish / estuarine"`, `"Marine"`. |
 | `readiness` | | string | Force a status when no usable weights exist: `needs_training` or `incompatible`. |
 | `status_note` | | string | One-line honest note about provenance / limitations, shown on the card. |
+| `download_url` | | string | Direct HTTPS URL of the checkpoint. With `sha256`, the Models page can fetch it on demand. |
+| `sha256` | | string | 64-hex SHA-256 of the weights, verified after download (a mismatch is rejected). |
+| `archive_member` | | string | When `download_url` is a zip, the path of the weights *inside* it (e.g. `"model.pt"`); the extracted file is hashed. |
+| `metrics` | | object | Evaluation metrics, e.g. `{"mAP@50": "0.79"}`. Shown only when recorded — never invented. |
+| `limitations` | | string | Known caveats, shown on the card. |
+| `video_verified` | | boolean | `true` **only** after the model was really tested on a video. Defaults to `false`. |
 
 Example:
 
@@ -97,8 +106,9 @@ Example:
 - **Fail-safe**: an invalid entry is *logged and skipped* — a broken file
   never prevents the built-in models from working.
 - **Path containment**: `weights` must resolve inside `models/`.
-- **No auto-download**: custom models have no official URL, so
-  `scripts/download_models.py` never fetches them.
+- **Explicit downloads only**: BlueEye fetches a custom model *only* when the
+  entry declares a `download_url` (ideally with a `sha256`, which is verified
+  after download). Otherwise you place the `.pt` file yourself.
 - **Live reload**: the file is re-read whenever it changes (restart not
   strictly required for the CLI; the web UI re-reads it on the next run).
 - **`auto` mode** includes every installed custom model whose `auto` is not
@@ -116,11 +126,13 @@ python -m app.main --image path/to/image.jpg --model regional_karnataka
 python -m streamlit run app/ui/streamlit_app.py
 ```
 
-> **Indian-biodiversity templates.** `registry.json.example` also contains
-> ready-to-edit entries for the Indian models (`freshwater_fish`,
-> `gangetic_dolphin`, `freshwater_turtle`, `gharial`, `indian_marine`). See
-> [`docs/indian_biodiversity.md`](../../docs/indian_biodiversity.md) for what
-> each one needs before it can run.
+> **Inactive research models.** The Indian targets (`freshwater_fish`,
+> `gangetic_dolphin`, `freshwater_turtle`, `gharial`, `indian_marine`) and the
+> incompatible Axera export (`aquarium_axera`) live in
+> `models/custom/inactive_models.json`. They are **not loaded** and never
+> appear in a selector; the file preserves their provenance so they can be
+> reactivated once real weights exist. See
+> [`docs/indian_biodiversity.md`](../../docs/indian_biodiversity.md).
 
 ## Honesty policy
 

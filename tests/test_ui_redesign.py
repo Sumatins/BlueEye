@@ -29,9 +29,18 @@ def test_nav_offers_separate_image_and_video_entry_points() -> None:
 
 def test_required_navigation_links_are_present() -> None:
     labels = [label for _, label, _ in theme.PAGES]
-    for required in ("Dashboard", "Detect Image", "Detect Video", "Models",
-                     "Analytics", "History", "About"):
+    for required in ("Dashboard", "Detect Image", "Detect Video", "Species Explorer",
+                     "Models", "Analytics", "History", "About"):
         assert required in labels
+
+
+def test_sidebar_groups_match_the_brief() -> None:
+    grouped = {title: ids for title, ids in theme.NAV_GROUPS}
+    assert grouped["Overview"] == ("dashboard",)
+    assert grouped["Detection"] == ("detect_image", "detect_video")
+    assert grouped["Explore"] == ("species", "models", "analytics")
+    assert grouped["Activity"] == ("history",)
+    assert grouped["Information"] == ("about",)
 
 
 def test_detect_pages_preselect_media() -> None:
@@ -64,15 +73,19 @@ def test_dashboard_has_required_sections() -> None:
         encoding="utf-8"
     )
     for marker in (
+        "Understand aquatic life",
         "Detect an Image",
         "Analyse a Video",
-        "How BlueEye works",
-        "Observation overview",
-        "Recent detections",
         "Explore BlueEye",
+        "Biodiversity Analytics",
+        "How BlueEye works",
+        "Capabilities",
         "Responsible use",
     ):
         assert marker in source
+    # The negative-capabilities block and the duplicated history list are gone.
+    for removed in ("Recent detections", "Observation overview", "What BlueEye does not do"):
+        assert removed not in source
 
 
 def test_registry_metrics_are_parsed(tmp_path) -> None:

@@ -34,6 +34,7 @@ from app.ui.pages import (  # noqa: E402
     detect,
     history_page,
     models,
+    species,
 )
 from app.ui.icons import span  # noqa: E402
 from app.ui.theme import DETECT_PAGES, PAGES, apply_theme  # noqa: E402
@@ -46,6 +47,7 @@ PAGE_MODULES = {
     "dashboard": dashboard,
     "detect_image": detect,
     "detect_video": detect,
+    "species": species,
     "models": models,
     "analytics": analytics,
     "history": history_page,
@@ -127,7 +129,7 @@ def _sidebar_status(detector) -> None:
         key="sidebar_download",
     ):
         try:
-            with st.spinner("Downloading model weights (~87 MB per model)..."):
+            with st.spinner("Downloading missing model weights..."):
                 detector.model_manager.download_all()
             st.cache_resource.clear()
             st.rerun()

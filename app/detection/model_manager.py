@@ -21,12 +21,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
+import shutil
 import time
 import urllib.error
 import urllib.request
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -44,6 +47,22 @@ _MIN_WEIGHT_BYTES = 1_000_000
 
 #: Maps :attr:`ModelSpec.loader` to the Ultralytics class that opens it.
 LOADERS: dict[str, str] = {"yolo": "YOLO", "rtdetr": "RTDETR"}
+
+
+def _sha256_file(path: Path) -> str:
+    """Streaming SHA-256 of a file (used to verify downloaded weights)."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _extract_member(archive_path: Path, member: str, destination: Path) -> None:
+    """Extract one zip member to ``destination`` (streamed, not in memory)."""
+    with zipfile.ZipFile(archive_path) as archive:
+        with archive.open(member) as source, open(destination, "wb") as target:
+            shutil.copyfileobj(source, target, length=1 << 20)
 
 
 class ModelError(Exception):
@@ -111,6 +130,23 @@ class ModelSpec:
     #: ``(label, value)`` pairs (e.g. ``("mAP@50", "0.83")``). Empty when no
     #: metrics were measured - BlueEye never invents evaluation numbers.
     metrics: tuple[tuple[str, str], ...] = ()
+    #: Known limitations, shown on the Models page. Only real, verified
+    #: caveats belong here - never a guess.
+    limitations: str = ""
+    #: ``True`` only when this model was actually run through the video
+    #: pipeline (frame-by-frame) and produced valid output. Defaults to
+    #: ``False`` so video support is never claimed without a test.
+    video_verified: bool = False
+    #: Direct URL for a non-built-in checkpoint (e.g. a Hugging Face
+    #: ``resolve`` link). Empty for models BlueEye does not fetch itself.
+    download_url: str = ""
+    #: SHA-256 of the weights. Verified after download when provided, so a
+    #: corrupted or substituted file is rejected.
+    sha256: str = ""
+    #: When the checkpoint is only distributed inside a zip archive, the path
+    #: of the weights *inside* that archive (e.g. ``"model.pt"``). Empty when
+    #: the download URL points straight at the weights.
+    archive_member: str = ""
 
     @property
     def short_description(self) -> str:
@@ -119,7 +155,7 @@ class ModelSpec:
     @property
     def is_downloadable(self) -> bool:
         """True when BlueEye knows an official URL for these weights."""
-        return bool(self.url)
+        return bool(self.url or self.download_url)
 
     def readiness_status(self, available: bool) -> str:
         """One of ``ready`` / ``not_installed`` / ``needs_training`` / ``incompatible``.
@@ -175,6 +211,11 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
                 "crown_of_thorns",
                 "lobster",
             ),
+            limitations=(
+                "Trained on Indo-Pacific reef families, not Indian freshwater "
+                "fish. Invertebrate classes are group-level, not species-level."
+            ),
+            video_verified=True,
         ),
         ModelSpec(
             key="megafauna",
@@ -196,6 +237,11 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
             icon="🦈",
             habitat="Marine",
             classes=("shark", "ray", "turtle"),
+            limitations=(
+                "Group-level classes: cannot distinguish a whale shark from "
+                "other sharks, or an Olive Ridley from other sea turtles."
+            ),
+            video_verified=True,
         ),
     )
 }
@@ -350,6 +396,23 @@ def _parse_custom_entry(
                 continue
             metrics.append((str(metric_key), str(metric_value)))
 
+    download_url = str(
+        entry.get("download_url") or entry.get("download") or ""
+    ).strip()
+    if download_url and not download_url.lower().startswith(("https://", "http://")):
+        _reject(f"model '{key}' has an invalid download_url.")
+        return None
+
+    sha256 = str(entry.get("sha256") or "").strip().lower()
+    if sha256 and not re.fullmatch(r"[0-9a-f]{64}", sha256):
+        _reject(f"model '{key}' has an invalid sha256 (expected 64 hex chars).")
+        return None
+
+    archive_member = str(entry.get("archive_member") or "").strip()
+    if archive_member and not download_url:
+        _reject(f"model '{key}' sets archive_member without a download_url.")
+        return None
+
     return ModelSpec(
         key=key,
         display_name=name,
@@ -373,6 +436,11 @@ def _parse_custom_entry(
         readiness=readiness,
         status_note=str(entry.get("status_note") or "").strip(),
         metrics=tuple(metrics),
+        limitations=str(entry.get("limitations") or "").strip(),
+        video_verified=bool(entry.get("video_verified", False)),
+        download_url=download_url,
+        sha256=sha256,
+        archive_member=archive_member,
     )
 
 
@@ -576,6 +644,13 @@ class ModelManager:
 
         destination.parent.mkdir(parents=True, exist_ok=True)
         partial = destination.with_suffix(destination.suffix + ".part")
+        url = spec.download_url or spec.url
+        if not url:
+            raise ModelDownloadError(
+                f"No download URL is registered for '{spec.display_name}'. "
+                "Place the weights under 'models/' yourself (see "
+                "models/custom/README.md)."
+            )
         logger.info("Downloading model '%s' -> %s", key, destination)
 
         def _hook(block_count: int, block_size: int, total_size: int) -> None:
@@ -588,8 +663,22 @@ class ModelManager:
             progress(downloaded, total)
 
         try:
-            urllib.request.urlretrieve(spec.url, str(partial), reporthook=_hook)  # noqa: S310 - official HTTPS URLs
-        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            if spec.archive_member:
+                archive_path = partial.with_suffix(partial.suffix + ".zip")
+                urllib.request.urlretrieve(url, str(archive_path), reporthook=_hook)  # noqa: S310 - official HTTPS URLs
+                try:
+                    _extract_member(archive_path, spec.archive_member, partial)
+                finally:
+                    archive_path.unlink(missing_ok=True)
+            else:
+                urllib.request.urlretrieve(url, str(partial), reporthook=_hook)  # noqa: S310 - official HTTPS URLs
+        except (
+            urllib.error.URLError,
+            OSError,
+            TimeoutError,
+            zipfile.BadZipFile,
+            KeyError,
+        ) as exc:
             partial.unlink(missing_ok=True)
             raise ModelDownloadError(
                 f"Could not download '{spec.display_name}' weights: {exc}. "
@@ -604,6 +693,16 @@ class ModelManager:
                 "Please retry."
             )
 
+        if spec.sha256:
+            actual = _sha256_file(partial)
+            if actual != spec.sha256:
+                partial.unlink(missing_ok=True)
+                raise ModelDownloadError(
+                    f"Downloaded file for '{spec.display_name}' failed the "
+                    f"SHA-256 integrity check (got {actual[:12]}..., expected "
+                    f"{spec.sha256[:12]}...). The file was removed."
+                )
+
         partial.replace(destination)
         logger.info(
             "Downloaded model '%s' (%.1f MB)", key, destination.stat().st_size / (1024 * 1024)
@@ -611,10 +710,11 @@ class ModelManager:
         return destination
 
     def download_all(self, progress: ProgressCallback | None = None) -> list[Path]:
-        """Download every missing built-in model; returns the local paths.
+        """Download every missing model that declares a download URL.
 
-        User-registered custom models have no official URL and are therefore
-        never downloaded - they are placed on disk by the user.
+        This covers the two built-in models and any registered custom model
+        that provides a ``download_url`` (with an optional ``sha256``). A
+        custom model with no URL is skipped - the user places it on disk.
         """
         return [
             self.download(spec.key, progress)
