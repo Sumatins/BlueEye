@@ -1,0 +1,33 @@
+{
+  "_readme": "Copy this file to registry.json (same folder) and edit it. It is a template - nothing here is loaded until the weights file actually exists. Full documentation: models/custom/README.md and docs/regional_models.md.",
+  "models": [
+    {
+      "id": "regional_karnataka",
+      "name": "Karnataka Coastal Species",
+      "weights": "regional/karnataka/BlueEyeRegional.pt",
+      "classes": ["tuna", "mackerel", "shark"],
+      "type": "yolov8",
+      "version": "0.1",
+      "recommended_confidence": 0.5,
+      "source": "Trained in-house on a local dataset",
+      "license": "",
+      "category": "regional",
+      "icon": "🌊",
+      "summary": "Species recorded along the Karnataka coast.",
+      "description": "Custom YOLOv8 model trained for regional waters."
+    },
+    {
+      "id": "blueeye_custom",
+      "name": "BlueEye Custom Model",
+      "weights": "custom/BlueEyeCustom.pt",
+      "classes": [],
+      "type": "yolov8",
+      "version": "0.1",
+      "recommended_confidence": 0.5,
+      "source": "User-provided",
+      "category": "custom",
+      "icon": "🐟",
+      "summary": "Any YOLOv8 checkpoint you place under models/."
+    }
+  ]
+}

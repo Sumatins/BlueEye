@@ -1,0 +1,15 @@
+services:
+  blueeye:
+    build: .
+    image: blueeye:latest
+    container_name: blueeye
+    ports:
+      - "8501:8501"
+    volumes:
+      # Persist model weights, uploads and detection results on the host.
+      - ./models:/blueeye/models
+      - ./data:/blueeye/data
+      - ./outputs:/blueeye/outputs
+    environment:
+      - BLUEEYE_LOG_LEVEL=INFO
+    restart: unless-stopped

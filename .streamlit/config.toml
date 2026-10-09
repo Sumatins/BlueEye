@@ -1,0 +1,19 @@
+# Streamlit configuration for BlueEye.
+# maxUploadSize is aligned with BLUEEYE_MAX_VIDEO_MB (app/config.py default),
+# otherwise Streamlit's built-in 200 MB cap would reject uploads before
+# BlueEye's own validation runs.
+[server]
+maxUploadSize = 400
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+# BlueEye ocean design system (see app/ui/theme.py for the CSS tokens).
+[theme]
+base = "light"
+primaryColor = "#0891b2"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f2f8fc"
+textColor = "#0f2437"
+font = "sans serif"

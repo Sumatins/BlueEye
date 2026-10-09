@@ -1,0 +1,18 @@
+# BlueEye runtime dependencies (Python 3.10+)
+# The reference project (marine-detect) pins were relaxed so the stack
+# installs cleanly on modern Python versions.
+
+# Deep learning backend
+torch>=2.0
+torchvision>=0.15
+ultralytics>=8.3,<9          # YOLOv8 inference
+
+# Image / video processing
+opencv-python>=4.8
+numpy>=1.24
+pillow>=10.0
+tqdm>=4.65
+imageio-ffmpeg>=0.4.9   # bundled ffmpeg -> H.264 annotated videos (browser-playable)
+
+# Web UI
+streamlit>=1.49       # width="stretch" replaces the removed use_container_width

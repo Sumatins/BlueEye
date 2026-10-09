@@ -1,0 +1,307 @@
+"""BlueEye marine-life detector: the single inference entry point.
+
+``MarineDetector`` hides model loading, device selection, per-model
+confidence thresholds and result construction behind a small interface:
+
+* :meth:`MarineDetector.load_model`        - preload weights
+* :meth:`MarineDetector.predict_image`     - detect on an image array
+* :meth:`MarineDetector.predict_frame`     - detect on one video frame
+* :meth:`MarineDetector.predict_video`     - full video pipeline
+* :meth:`MarineDetector.get_class_names`   - class names of a model
+
+The UI and the CLI never talk to Ultralytics directly.
+
+SPDX-License-Identifier: AGPL-3.0-only
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from pathlib import Path
+from typing import Any, Iterable
+
+import numpy as np
+
+from app.config import Settings, get_settings
+from app.detection.model_manager import (
+    ModelManager,
+    ModelNotAvailableError,
+)
+from app.detection.results import Detection, DetectionResult
+
+logger = logging.getLogger(__name__)
+
+#: Valid values for the "model selection" parameter.
+MODEL_SELECTIONS = ("auto", "fish_inv", "megafauna")
+
+#: Aliases accepted for convenience.
+_SELECTION_ALIASES = {
+    "auto": "auto",
+    "both": "auto",
+    "all": "auto",
+    "combined": "auto",
+    "fish": "fish_inv",
+    "fish_inv": "fish_inv",
+    "fishinv": "fish_inv",
+    "fish_&_invertebrates": "fish_inv",
+    "invertebrates": "fish_inv",
+    "mega": "megafauna",
+    "megafauna": "megafauna",
+}
+
+
+class MarineDetector:
+    """YOLOv8-based marine-life detector.
+
+    Parameters
+    ----------
+    model_manager:
+        Optional injected :class:`ModelManager` (tests substitute a fake).
+    settings:
+        Optional injected :class:`Settings`.
+    """
+
+    def __init__(
+        self,
+        model_manager: ModelManager | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        self.settings = settings or get_settings()
+        self.model_manager = model_manager or ModelManager(self.settings)
+
+    # ------------------------------------------------------------------ #
+    # Model handling
+    # ------------------------------------------------------------------ #
+    @property
+    def device(self) -> str:
+        return self.model_manager.device
+
+    def resolve_keys(self, model_selection: str | None = None) -> list[str]:
+        """Turn a selection (``auto`` / ``fish_inv`` / ``megafauna``) into
+        the list of model keys that will run.
+
+        ``auto`` runs **every model whose weights are available**
+        (combined mode). Raises :class:`ModelNotAvailableError` when nothing
+        usable is selected or present.
+        """
+        selection = (model_selection or self.settings.default_model_selection or "auto")
+        normalized = _SELECTION_ALIASES.get(str(selection).strip().lower())
+        if normalized is None:
+            raise ModelNotAvailableError(
+                f"Unknown model selection '{selection}'. "
+                f"Choose one of: {', '.join(MODEL_SELECTIONS)}."
+            )
+
+        if normalized == "auto":
+            available = [spec.key for spec in self.model_manager.available_models()]
+            if not available:
+                raise ModelNotAvailableError(
+                    "No model weights found. Download them with "
+                    "'python scripts/download_models.py' or via the download "
+                    "button in the web UI, then try again."
+                )
+            logger.info("Model selection 'auto' -> models: %s", ", ".join(available))
+            return available
+
+        if not self.model_manager.is_available(normalized):
+            spec = self.model_manager.get_spec(normalized)
+            raise ModelNotAvailableError(
+                f"Model weights for '{spec.display_name}' are not available "
+                f"locally. Run 'python scripts/download_models.py' to download them."
+            )
+        return [normalized]
+
+    def load_model(self, model_selection: str | None = None) -> list[str]:
+        """Preload the selected model(s) into memory; returns their keys."""
+        keys = self.resolve_keys(model_selection)
+        for key in keys:
+            self.model_manager.load(key)
+        return keys
+
+    def get_class_names(self, model_selection: str | None = None) -> dict[str, dict[int, str]]:
+        """Class names per model key for the selected model(s)."""
+        keys = self.resolve_keys(model_selection)
+        return {key: self.model_manager.get_class_names(key) for key in keys}
+
+    # ------------------------------------------------------------------ #
+    # Inference
+    # ------------------------------------------------------------------ #
+    def predict_image(
+        self,
+        image: np.ndarray,
+        model_selection: str | None = None,
+        confidence: float | None = None,
+        source_name: str = "image",
+        enhanced: bool = False,
+    ) -> DetectionResult:
+        """Run detection on a BGR image array and return structured results.
+
+        Parameters
+        ----------
+        image:
+            ``H x W x 3`` BGR ``uint8`` array (OpenCV convention).
+        model_selection:
+            ``auto`` (all available models), ``fish_inv`` or ``megafauna``.
+        confidence:
+            Minimum confidence in ``[0, 1]``. ``None`` uses each model's
+            recommended threshold (FishInv 0.523 / MegaFauna 0.546, as
+            published upstream).
+        """
+        if image is None or not isinstance(image, np.ndarray) or image.ndim != 3:
+            raise ValueError("predict_image expects an HxWx3 BGR numpy array.")
+        if confidence is not None and not 0.0 <= float(confidence) <= 1.0:
+            raise ValueError("confidence must be between 0.0 and 1.0.")
+
+        keys = self.resolve_keys(model_selection)
+        height, width = image.shape[:2]
+
+        detections: list[Detection] = []
+        thresholds: dict[str, float] = {}
+        started = time.perf_counter()
+
+        for key in keys:
+            spec = self.model_manager.get_spec(key)
+            applied = spec.recommended_confidence if confidence is None else float(confidence)
+            thresholds[key] = applied
+            model = self.model_manager.load(key)
+
+            try:
+                raw_results = model.predict(
+                    image,
+                    conf=applied,
+                    device=self.device,
+                    verbose=False,
+                )
+            except Exception as exc:  # noqa: BLE001 - friendly surfaced error
+                raise RuntimeError(
+                    f"Inference failed on model '{spec.display_name}': {exc}"
+                ) from exc
+
+            result = raw_results[0] if raw_results else None
+            if result is None or getattr(result, "boxes", None) is None:
+                continue
+            names = getattr(result, "names", {}) or {}
+            for box in result.boxes:
+                # Explicit post-filter (the threshold is also passed to the
+                # model, this guarantees the documented behaviour).
+                box_conf = float(box.conf[0] if hasattr(box.conf, "__len__") else box.conf)
+                if box_conf < applied:
+                    continue
+                cls_idx = int(box.cls[0] if hasattr(box.cls, "__len__") else box.cls)
+                x1, y1, x2, y2 = (float(v) for v in box.xyxy[0])
+                # Clamp boxes to the frame and drop degenerate results.
+                x1 = max(0.0, min(x1, width - 1))
+                x2 = max(0.0, min(x2, width - 1))
+                y1 = max(0.0, min(y1, height - 1))
+                y2 = max(0.0, min(y2, height - 1))
+                if x2 - x1 < 1 or y2 - y1 < 1:
+                    continue
+                detections.append(
+                    Detection.from_xyxy(
+                        (x1, y1, x2, y2),
+                        class_name=str(names.get(cls_idx, cls_idx)),
+                        confidence=box_conf,
+                        model=key,
+                    )
+                )
+
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        logger.info(
+            "Detected %d object(s) in %s using [%s] in %.0f ms",
+            len(detections),
+            source_name,
+            ", ".join(keys),
+            elapsed_ms,
+        )
+        return DetectionResult(
+            source=str(source_name),
+            detections=detections,
+            models_used=list(keys),
+            confidence_threshold=None if confidence is None else float(confidence),
+            thresholds=thresholds,
+            inference_time_ms=elapsed_ms,
+            image_width=width,
+            image_height=height,
+            enhanced=enhanced,
+        )
+
+    def predict_frame(
+        self,
+        frame: np.ndarray,
+        model_selection: str | None = None,
+        confidence: float | None = None,
+        frame_index: int | None = None,
+        enhanced: bool = False,
+    ) -> DetectionResult:
+        """Detect on a single video frame (alias of :meth:`predict_image`)."""
+        name = f"frame {frame_index}" if frame_index is not None else "frame"
+        return self.predict_image(
+            frame,
+            model_selection=model_selection,
+            confidence=confidence,
+            source_name=name,
+            enhanced=enhanced,
+        )
+
+    def predict_video(
+        self,
+        input_path: str | Path,
+        output_path: str | Path | None = None,
+        model_selection: str | None = None,
+        confidence: float | None = None,
+        enhancement: Any = None,
+        progress_callback: Any = None,
+        save_json: bool = True,
+        max_frames: int | None = None,
+    ):
+        """Run the full frame-by-frame video pipeline.
+
+        Delegates to :class:`app.processing.video_processor.VideoProcessor`
+        (imported lazily to avoid a package cycle).
+        """
+        from app.processing.video_processor import VideoProcessor
+
+        processor = VideoProcessor(self, settings=self.settings)
+        return processor.process(
+            input_path=input_path,
+            output_path=output_path,
+            model_selection=model_selection,
+            confidence=confidence,
+            enhancement=enhancement,
+            progress_callback=progress_callback,
+            save_json=save_json,
+            max_frames=max_frames,
+        )
+
+    # ------------------------------------------------------------------ #
+    # Introspection
+    # ------------------------------------------------------------------ #
+    def model_status(self) -> list[dict[str, Any]]:
+        """Per-model status used by the CLI and the UI.
+
+        Includes user-registered custom models (see
+        :meth:`app.detection.model_manager.ModelManager.registry`).
+        """
+        from app.detection.model_manager import iter_specs
+
+        status = []
+        for spec in iter_specs(self.model_manager):
+            available = self.model_manager.is_available(spec.key)
+            entry: dict[str, Any] = {
+                "key": spec.key,
+                "name": spec.display_name,
+                "description": spec.description,
+                "available": available,
+                "recommended_confidence": spec.recommended_confidence,
+                "path": str(self.model_manager.resolve_path(spec.key)),
+                "classes": [],
+            }
+            if available:
+                try:
+                    names = self.model_manager.get_class_names(spec.key)
+                    entry["classes"] = [names[idx] for idx in sorted(names)]
+                except Exception:  # noqa: BLE001 - status must never crash
+                    entry["classes"] = []
+            status.append(entry)
+        return status
