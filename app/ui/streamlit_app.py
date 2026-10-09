@@ -108,11 +108,18 @@ def _sidebar_status(detector) -> None:
     st.caption(f"Device: `{detector.device}` · models ready: {len(ready)}/{len(registry)}")
 
     rows = "".join(
-        f"<div style='margin:.15rem 0'>{status_badge(key in ready)} "
+        f"<div style='margin:.15rem 0'>{status_badge(True)} "
         f"<span style='color:#dcebf6;font-size:.86rem'>{spec.display_name}</span></div>"
         for key, spec in registry.items()
+        if key in ready
     )
     st.markdown(rows, unsafe_allow_html=True)
+
+    extra = len(registry) - len(ready)
+    if extra:
+        st.caption(
+            f"+{extra} additional / not-installed model(s) — see the Models page."
+        )
 
     if not ready:
         if st.button(

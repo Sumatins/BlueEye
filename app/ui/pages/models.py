@@ -27,6 +27,7 @@ from app.ui.components import (
     error_card,
     hero,
     metrics_row,
+    model_status_badge,
     notice,
     status_badge,
 )
@@ -69,7 +70,13 @@ def render(detector: MarineDetector, settings) -> None:
     if downloadable:
         _download_panel(detector, downloadable)
 
-    _model_grid(detector, registry, ready)
+    core = [
+        spec
+        for spec in registry.values()
+        if spec.category not in state.ADDITIONAL_CATEGORIES
+    ]
+    _model_grid(detector, core, ready)
+    _additional_section(detector, registry, ready)
     _custom_section(detector, registry)
 
 
@@ -93,6 +100,7 @@ def _download_panel(detector: MarineDetector, downloadable: list[ModelSpec]) -> 
         try:
             with st.spinner("Downloading model weights..."):
                 detector.model_manager.download_all()
+            st.session_state.pop("model_verify", None)
             st.cache_resource.clear()
             st.rerun()
         except ModelError as exc:
@@ -100,15 +108,14 @@ def _download_panel(detector: MarineDetector, downloadable: list[ModelSpec]) -> 
             logger.warning("Model download failed: %s", exc)
 
 
-def _model_grid(detector: MarineDetector, registry: dict, ready: set) -> None:
-    """Two-column card grid of every registered model."""
-    keys = list(registry.keys())
-    for row_start in range(0, len(keys), 2):
-        row_keys = keys[row_start : row_start + 2]
+def _model_grid(detector: MarineDetector, specs: list[ModelSpec], ready: set) -> None:
+    """Two-column card grid of the core registered models."""
+    for row_start in range(0, len(specs), 2):
+        row_specs = specs[row_start : row_start + 2]
         columns = st.columns(2)
-        for column, key in zip(columns, row_keys):
+        for column, spec in zip(columns, row_specs):
             with column:
-                _model_card(detector, registry[key], key in ready)
+                _model_card(detector, spec, spec.key in ready)
         st.write("")
 
 
@@ -176,6 +183,7 @@ def _download_one(detector: MarineDetector, spec: ModelSpec) -> None:
     try:
         with st.spinner(f"Downloading {spec.display_name}..."):
             detector.model_manager.download(spec.key)
+        st.session_state.pop("model_verify", None)
         st.cache_resource.clear()
         st.rerun()
     except ModelError as exc:
@@ -198,11 +206,133 @@ def _class_names(detector: MarineDetector, spec: ModelSpec, available: bool) -> 
 
 
 # --------------------------------------------------------------------------- #
+# Additional / Indian aquatic species models
+# --------------------------------------------------------------------------- #
+def _verified(detector: MarineDetector, spec: ModelSpec) -> dict:
+    """Load + inference status for one model, cached per session.
+
+    The cache key carries the weight file's mtime so a re-downloaded file is
+    re-verified. Models known to need training / be incompatible answer
+    immediately without loading anything (see ``ModelManager.verify``).
+    """
+    try:
+        path = detector.model_manager.resolve_path(spec.key)
+        stamp = path.stat().st_mtime_ns if path.is_file() else 0
+    except Exception:  # noqa: BLE001 - never break the page
+        stamp = 0
+
+    cache = st.session_state.setdefault("model_verify", {})
+    entry = cache.get(spec.key)
+    if entry and entry.get("stamp") == stamp:
+        return entry["result"]
+
+    result = detector.verify_model(spec.key)
+    cache[spec.key] = {"stamp": stamp, "result": result}
+    return result
+
+
+def _additional_section(detector: MarineDetector, registry: dict, ready: set) -> None:
+    """'Additional Indian Aquatic Species Models' - optional, opt-in models."""
+    specs = state.additional_specs(registry)
+    if not specs:
+        return
+
+    st.markdown("### Additional Indian Aquatic Species Models")
+    ready_count = sum(1 for spec in specs if spec.key in ready)
+    notice(
+        st,
+        "info",
+        "Optional, opt-in models",
+        f"{ready_count} of {len(specs)} additional model(s) are installed. "
+        "They are never run by 'Auto' - select one explicitly (or use "
+        "'Every installed model') in Detect. Status reflects a real inference "
+        "test, not just the presence of a config file.",
+    )
+
+    for row_start in range(0, len(specs), 2):
+        row_specs = specs[row_start : row_start + 2]
+        columns = st.columns(2)
+        for column, spec in zip(columns, row_specs):
+            with column:
+                _additional_card(detector, spec, spec.key in ready)
+        st.write("")
+
+
+def _additional_card(detector: MarineDetector, spec: ModelSpec, available: bool) -> None:
+    """Card for one additional model, with an honest readiness status."""
+    if spec.readiness:
+        result = {"status": spec.readiness, "ok": False, "error": None, "classes": []}
+    else:
+        result = _verified(detector, spec)
+    status = str(result.get("status") or spec.readiness_status(available))
+    classes = list(result.get("classes") or spec.classes)
+
+    metadata: list[tuple[str, str]] = [
+        ("Architecture", spec.architecture),
+        ("Habitat", spec.habitat or "—"),
+        ("Classes", str(len(classes)) if classes else "—"),
+        ("Recommended threshold", f"{spec.recommended_confidence:.3f}"),
+        ("Weights", "present" if available else "not installed"),
+        ("Source", spec.source or "—"),
+        ("License", spec.license or "—"),
+    ]
+
+    body = (
+        f"<p class='be-card-sub'>{esc(spec.summary or spec.description)}</p>"
+        f"<div style='margin:.3rem 0 .5rem'>{model_status_badge(status)} "
+        f"{badge('Additional', 'info')}</div>"
+    )
+    if classes:
+        body += f"<div style='margin-bottom:.4rem'>{chips(classes)}</div>"
+    body += (
+        "<dl class='be-kv'>"
+        + "".join(f"<dt>{esc(k)}</dt><dd>{esc(v)}</dd>" for k, v in metadata)
+        + "</dl>"
+    )
+    if spec.status_note:
+        body += f"<p class='be-card-sub'>{esc(spec.status_note)}</p>"
+    if result.get("error"):
+        body += f"<p class='be-card-sub'>Inference error: {esc(str(result['error']))}</p>"
+    if spec.homepage:
+        body += f"<p class='be-card-sub'>Reference: {esc(spec.homepage)}</p>"
+
+    st.markdown(
+        f"<div class='be-card'><div class='be-card-title'>{span(spec.icon)}"
+        f"{esc(spec.display_name)}</div>{body}</div>",
+        unsafe_allow_html=True,
+    )
+
+    if status == "ready":
+        if st.button(
+            "Use this model",
+            icon=":material/check_circle:",
+            key=f"use_{spec.key}",
+            width="stretch",
+        ):
+            st.session_state["model_selection"] = spec.key
+            state.navigate("detect")
+    elif status == "not_installed" and spec.is_downloadable:
+        if st.button(
+            "Download weights",
+            icon=":material/download:",
+            key=f"dl_{spec.key}",
+            width="stretch",
+        ):
+            _download_one(detector, spec)
+    else:
+        st.caption("Not runnable yet - see the note above.")
+
+
+# --------------------------------------------------------------------------- #
 # Custom / regional models
 # --------------------------------------------------------------------------- #
 def _custom_section(detector: MarineDetector, registry: dict) -> None:
     """Explain the extension seam for regional and future custom models."""
-    custom = [spec for spec in registry.values() if spec.custom]
+    custom = [
+        spec
+        for spec in registry.values()
+        if spec.custom and spec.category not in state.ADDITIONAL_CATEGORIES
+    ]
 
     st.markdown("### Regional and custom models")
     if custom:
@@ -216,11 +346,11 @@ def _custom_section(detector: MarineDetector, registry: dict) -> None:
     else:
         notice(
             st,
-            "warning",
-            "No regional model installed",
-            "BlueEye supports regional / local species models, but none is "
-            "installed. Support is ready for a custom model integration - "
-            "BlueEye does not claim a regional model exists when it does not. "
+            "info",
+            "No user custom model registered",
+            "BlueEye supports regional / local species models through "
+            "models/custom/registry.json, but no user model is registered. "
+            "The optional pretrained models above are listed separately. "
             "See docs/indian_biodiversity.md for the Indian freshwater / "
             "coastal roadmap and which models still need training.",
         )
@@ -237,8 +367,8 @@ without touching application code:
    `models/regional/karnataka/BlueEyeRegional.pt`.
 3. Describe it in `models/custom/registry.json` (a commented template lives at
    `models/custom/registry.json.example`).
-4. Restart BlueEye — the model appears here, in Detect, in `auto` mode and in
-   the CLI.
+4. Restart BlueEye — the model appears here, in Detect and in the CLI. It runs
+   in `auto` mode unless its entry sets `"auto": false`.
 
 Example entry:
 

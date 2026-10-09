@@ -1,5 +1,5 @@
 {
-  "_readme": "TEMPLATE ONLY. Copy this file to registry.json (same folder) and edit it. Nothing listed here is loaded or downloaded until the weights file actually exists on disk AND the entry is in registry.json. Full documentation: models/custom/README.md and docs/indian_biodiversity.md. BlueEye never fabricates weights - a model shows 'not installed' until you place its .pt file.",
+  "_readme": "TEMPLATE ONLY. Copy this file to registry.json (same folder) and edit it. Nothing listed here is loaded or downloaded until the weights file actually exists on disk AND the entry is in registry.json. Full documentation: models/custom/README.md and docs/indian_biodiversity.md. BlueEye never fabricates weights - a model shows 'not installed' until you place its .pt file. Optional fields: auto (default true; set false to keep a model out of 'auto'), habitat, architecture, readiness ('needs_training' | 'incompatible'), status_note, and type ('yolov8' | 'rtdetr').",
   "models": [
     {
       "id": "freshwater_fish",
@@ -9,13 +9,16 @@
       "type": "yolov8",
       "version": "0.1",
       "recommended_confidence": 0.5,
-      "source": "Trained in-house on DePondFi / Orange Chromide (CC BY 4.0)",
+      "auto": false,
+      "habitat": "Freshwater (ponds, lakes, rivers)",
+      "source": "Train in-house on DePondFi / Orange Chromide (CC BY 4.0)",
       "license": "Dataset CC BY 4.0; model weights by us",
-      "category": "freshwater",
+      "category": "indian",
       "icon": "set_meal",
       "summary": "Freshwater pond/river fish for Karnataka and South India.",
-      "description": "YOLOv8 model for freshwater fish in Indian ponds, lakes and rivers.",
-      "homepage": "https://data.mendeley.com/datasets/7w45jx35hd/1"
+      "description": "Train with training/datasets/freshwater_fish.yaml.",
+      "homepage": "https://data.mendeley.com/datasets/7w45jx35hd/1",
+      "status_note": "No trustworthy pretrained Indian freshwater-fish detector was found."
     },
     {
       "id": "gangetic_dolphin",
@@ -25,13 +28,16 @@
       "type": "yolov8",
       "version": "0.1",
       "recommended_confidence": 0.5,
-      "source": "Trained in-house on a locally annotated river survey dataset",
+      "auto": false,
+      "habitat": "Freshwater (Ganga / Brahmaputra / Chambal)",
+      "source": "Train in-house on a locally annotated river survey dataset",
       "license": "",
-      "category": "freshwater",
+      "category": "indian",
       "icon": "water",
       "summary": "Platanista gangetica in Ganga / Brahmaputra / Chambal rivers.",
-      "description": "YOLOv8 model for surfacing Gangetic river dolphins.",
-      "homepage": ""
+      "description": "Train with training/datasets/gangetic_dolphin.yaml.",
+      "homepage": "",
+      "status_note": "Endangered; no public pretrained weights - field imagery must be collected."
     },
     {
       "id": "freshwater_turtle",
@@ -41,13 +47,16 @@
       "type": "yolov8",
       "version": "0.1",
       "recommended_confidence": 0.5,
-      "source": "Trained in-house on a locally annotated dataset",
+      "auto": false,
+      "habitat": "Freshwater (rivers, lakes, ponds)",
+      "source": "Train in-house on a locally annotated dataset",
       "license": "",
-      "category": "freshwater",
+      "category": "indian",
       "icon": "pets",
       "summary": "Freshwater turtles in Indian rivers, lakes and ponds.",
-      "description": "YOLOv8 model for freshwater turtles (roofed, softshell, flapshell).",
-      "homepage": ""
+      "description": "Train with training/datasets/freshwater_turtle.yaml.",
+      "homepage": "",
+      "status_note": "The built-in turtle class is broad/marine; a freshwater model must be trained."
     },
     {
       "id": "gharial",
@@ -57,13 +66,16 @@
       "type": "yolov8",
       "version": "0.1",
       "recommended_confidence": 0.5,
-      "source": "Trained in-house on a locally annotated dataset",
+      "auto": false,
+      "habitat": "Freshwater (clear, fast-flowing rivers)",
+      "source": "Train in-house on a locally annotated dataset",
       "license": "",
-      "category": "freshwater",
+      "category": "indian",
       "icon": "landscape",
       "summary": "Gavialis gangeticus in clear, fast-flowing Indian rivers.",
-      "description": "YOLOv8 model for gharials, typically basking on river banks.",
-      "homepage": ""
+      "description": "Train with training/datasets/gharial.yaml.",
+      "homepage": "",
+      "status_note": "No public pretrained gharial detector exists."
     },
     {
       "id": "indian_marine",
@@ -73,13 +85,16 @@
       "type": "yolov8",
       "version": "0.1",
       "recommended_confidence": 0.5,
-      "source": "Trained in-house on Underwater Species Dataset (NR), CC BY 4.0",
+      "auto": false,
+      "habitat": "Marine (Arabian Sea / Bay of Bengal)",
+      "source": "Train in-house on Underwater Species Dataset (NR), CC BY 4.0",
       "license": "Dataset CC BY 4.0; model weights by us",
-      "category": "marine",
+      "category": "indian",
       "icon": "water",
       "summary": "Species-level coastal model for the Arabian Sea / Bay of Bengal.",
-      "description": "YOLOv8 model for whale shark, octopus, rays and Olive Ridley turtles.",
-      "homepage": "https://data.mendeley.com/datasets/4tp83br92z/1"
+      "description": "Train with training/datasets/indian_marine.yaml.",
+      "homepage": "https://data.mendeley.com/datasets/4tp83br92z/1",
+      "status_note": "Octopus is not covered by any built-in model."
     },
     {
       "id": "blueeye_custom",

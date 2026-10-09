@@ -17,7 +17,14 @@ import streamlit as st
 from app import __version__
 from app.detection.detector import MarineDetector
 from app.ui import state
-from app.ui.components import badge, chips, hero, metrics_row, notice
+from app.ui.components import (
+    badge,
+    chips,
+    hero,
+    metrics_row,
+    model_status_badge,
+    notice,
+)
 from app.ui.icons import span
 from app.ui.theme import esc
 
@@ -277,14 +284,20 @@ def _models(detector: MarineDetector) -> None:
 
     rows: list[str] = []
     for spec in registry.values():
-        status = "Ready" if spec.key in ready else "Not installed"
-        kind = badge("Custom", "warn") if spec.custom else badge("Built-in", "info")
+        available = spec.key in ready
+        status = spec.readiness_status(available)
+        if spec.category in state.ADDITIONAL_CATEGORIES:
+            kind = badge("Additional", "warn")
+        elif spec.custom:
+            kind = badge("Custom", "warn")
+        else:
+            kind = badge("Built-in", "info")
         summary = spec.summary or spec.description
         rows.append(
             '<div class="be-card be-card--flush"><div class="be-iblock">'
             f'<div class="tile">{span("psychology")}</div><div class="body">'
             f'<p class="t">{esc(spec.display_name)}'
-            f'{badge(status, "ok" if spec.key in ready else "off", dot=True)}{kind}</p>'
+            f'{model_status_badge(status)}{kind}</p>'
             f'<p class="s">{esc(summary)}</p>'
             f'<div class="row">{chips((f"{len(spec.classes)} classes", spec.key))}</div>'
             "</div></div></div>"
@@ -293,10 +306,11 @@ def _models(detector: MarineDetector) -> None:
 
     st.markdown(
         """
-BlueEye is the **application**; the pretrained models above are part of
-the **marine-detect** project by Orange OpenSource. BlueEye did not train
-them - weights are downloaded on demand from the official links and are
-never fabricated or modified. Model cards, status badges and download
+BlueEye is the **application**. The two built-in models come from the
+**marine-detect** project by Orange OpenSource; the additional aquatic
+models come from their public Hugging Face repositories (the source is shown
+on each card). BlueEye did not train them - weights are downloaded on demand
+from the official links and are never fabricated or modified. Model cards, status badges and download
 actions live on the **Models** page.
 """
     )
@@ -308,9 +322,11 @@ def _limitations() -> None:
         """
 - Detection quality depends entirely on the training data of the selected
   model; it is not guaranteed to generalise to every sea, season or camera.
-- There is **no region-specific model** shipped with BlueEye. Support for
-  adding one (registry + training workflow) is documented in
-  `docs/regional_models.md`, but no model is claimed until real weights are
+- There is **no India-specific model** shipped with BlueEye. Three general
+  aquatic models are integrated as optional additions, but they are not
+  Indian-species models and are labelled as such. Support for adding an
+  Indian model (registry + training workflow) is documented in
+  `docs/indian_biodiversity.md`; no model is claimed until real weights are
   trained or sourced and verified.
 - Underwater enhancement is optional preprocessing, not an accuracy boost.
 - Very long videos are processed frame by frame in memory; extremely large

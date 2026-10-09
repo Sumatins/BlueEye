@@ -64,11 +64,10 @@ Legend — **Status**: `covered` = already detected (group or species);
 | D. Gharial | Freshwater (clear, fast rivers) | ❌ none | ❌ none verified | **needs data** |
 | E. Indian marine species | Marine (Arabian Sea / Bay of Bengal) | ❌ none species-specific | ✅ Underwater Species Dataset (NR), CC BY 4.0 | **architecture ready / needs training** |
 
-### Why no pretrained model was integrated
+### 2.1 Indian-species pretrained models: none found
 
-Everything below was searched, but none satisfied **all** of BlueEye's
-integration bar (licence permits use, class list known, YOLOv8 `.pt`,
-provenance verifiable, tested through BlueEye's own pipeline):
+Everything below was searched, but nothing provided **species-specific,
+licensed, ready-to-download Indian weights**:
 
 - **AquaYOLO** (Vijayalakshmi et al., *Scientific Reports* 2025) reports
   `aquayolo1/2/3.pt` trained on DePondFi. **No trustworthy public download
@@ -79,11 +78,53 @@ provenance verifiable, tested through BlueEye's own pipeline):
   not run through BlueEye's Ultralytics pipeline.
 - **Roboflow Universe** projects (dolphin, whale-shark, freshwater fish, …)
   are often unpublished or state no licence; a model may not be registered
-  without a verifiable class list and licence.
+  without a verifiable class list and licence, and their weights usually
+  require an account/API key rather than a direct public download.
 - **Community Fish Detector** (open weights) detects a single generic `fish`
   class across domains — redundant with the built-in `fish` class.
 
 This is deliberate: a fake "India model" would be worse than none.
+
+### 2.2 Pretrained aquatic models that *were* integrated (verified)
+
+Because the Indian-species models above could not be verified, BlueEye was
+extended with **three genuinely pretrained, publicly downloadable aquatic
+detectors** instead. Each was downloaded, loaded with Ultralytics and run on
+a real image before being registered; none is India-specific, and each is
+clearly documented as such. They are **opt-in** (`"auto": false`): `auto`
+still runs only the two core models, so existing behaviour is unchanged.
+
+| id | Classes | Architecture | Licence | Source (Hugging Face) | Status |
+|---|---|---|---|---|---|
+| `aquatic_brackish` | `crab`, `fish`, `jellyfish`, `shrimp`, `small_fish`, `starfish` | YOLOv8s | AGPL-3.0 | [dronefreak/brackish-yolov8s](https://huggingface.co/dronefreak/brackish-yolov8s) | **READY** |
+| `aquarium_marine` | `fish`, `jellyfish`, `penguin`, `puffin`, `shark`, `starfish`, `stingray` | RT-DETR | AGPL-3.0 | [Kanagavel/aquarium-rtdetr](https://huggingface.co/Kanagavel/aquarium-rtdetr) | **READY** |
+| `underwater_fish` | `fish` | YOLOv8n | US Gov. work (public domain / royalty-free) | [akridge/yolo8-fish-detector-grayscale](https://huggingface.co/akridge/yolo8-fish-detector-grayscale) | **READY** |
+
+Notes and provenance limits:
+
+- `aquatic_brackish` is trained on one **Danish brackish** camera — an
+  analogue for Indian **estuaries/backwaters**, not Indian rivers.
+- `aquarium_marine` is **community-contributed** with no published metrics;
+  the weights load and detect, but no evaluation numbers are claimed.
+- `underwater_fish` is trained on **grayscale** underwater footage and may
+  under-detect on colour images.
+
+Fetch them (SHA-256-pinned) with:
+
+```bash
+python scripts/fetch_additional_models.py
+```
+
+Weights live under `models/additional/<id>/` and stay out of Git. Verify
+every model — core and additional — with:
+
+```bash
+python -m app.main --verify-models
+```
+
+A fourth candidate, **AXERA-TECH/YOLOv8-Aquarium**, is registered as
+`aquarium_axera` with status **INCOMPATIBLE**: only Axera NPU (`.axmodel`)
+exports are published, so it cannot run through the Ultralytics pipeline.
 
 ---
 
@@ -125,15 +166,25 @@ Existing pipeline → boxes, labels, statistics, annotated image/video, JSON
 A model registered in `models/custom/registry.json` is automatically
 available:
 
-- on the **Models** page (with its real installed / not-installed status),
+- on the **Models** page (with its real status: *ready* / *not installed* /
+  *needs training* / *incompatible*),
 - in the **Detect** model selector,
-- in **`auto`** mode (runs every installed model and merges results — the
-  class sets are disjoint, so there are no duplicates),
 - in the **CLI**: `python -m app.main --image x.jpg --model <id>`.
+
+Two convenience selections exist:
+
+- **`auto`** (default) runs only the **core** models — `fish_inv` +
+  `megafauna` — so the original behaviour is preserved exactly;
+- **`all`** runs **every installed model** (core *and* additional). When
+  several models report the same class for the same object (IoU ≥ 0.7), the
+  lower-confidence duplicate is dropped, so combined results stay clean.
+
+Additional models default to opt-in (`"auto": false`); a user-added model
+defaults to `auto: true` unless it sets `"auto": false`.
 
 Weights are loaded **once** and cached by `ModelManager`, so video frames
 never trigger repeated disk loads. A missing weight file produces a clear
-error and never disables the other working models.
+error (exit code 3) and never disables the other working models.
 
 ---
 
@@ -146,6 +197,9 @@ applied outside the water body it was built for:
 |---|---|---|
 | `fish_inv` | Marine | Indo-Pacific coral reefs |
 | `megafauna` | Marine | Open water (shark / ray / turtle) |
+| `aquatic_brackish` | **Brackish / estuarine** | Estuaries and backwaters (trained on a Danish brackish site) |
+| `aquarium_marine` | Marine | Reef / aquarium footage (fish, shark, stingray, jellyfish, …) |
+| `underwater_fish` | Underwater | Grayscale camera footage (single `fish` class) |
 | `freshwater_fish` | **Freshwater** | Karnataka & South Indian ponds, lakes, rivers, reservoirs |
 | `gangetic_dolphin` | **Freshwater** | Ganga / Brahmaputra / Chambal river systems |
 | `freshwater_turtle` | **Freshwater** | Indian rivers, lakes, ponds |
@@ -197,6 +251,13 @@ Because underwater imagery differs strongly from ordinary photographs,
 - Gangetic dolphin, freshwater turtle and gharial have **no verified,
   licensed, ready-to-train detection dataset** found here; they need field /
   UAV imagery to be collected and annotated.
+- The three integrated additional models (`aquatic_brackish`,
+  `aquarium_marine`, `underwater_fish`) are **not India-specific**. They add
+  coverage of generic aquatic groups (fish, shark, stingray, jellyfish, crab,
+  shrimp, starfish) but must not be presented as Indian-species models.
+- `aquarium_marine` has **no published evaluation metrics** (community model);
+  it is marked READY only because the weights load and a real inference test
+  succeeds, not because a benchmark was reproduced.
 - No metrics are quoted for any Indian model because no Indian model has been
   trained and evaluated yet. Training is done by the user; BlueEye never
   invents numbers.
@@ -216,3 +277,10 @@ Because underwater imagery differs strongly from ordinary photographs,
 - Naveen P., Rajasekaran T. (2024). *Underwater Species Dataset (NR).* Mendeley Data. <https://data.mendeley.com/datasets/4tp83br92z/1>
 - Community Fish Detection dataset: <https://lila.science/datasets/community-fish-detection-dataset>
 - Ultralytics YOLOv8: <https://docs.ultralytics.com/models/yolov8/>
+
+### Integrated additional-model sources
+
+- `aquatic_brackish` — DetectionBench / Brackish Underwater: <https://huggingface.co/dronefreak/brackish-yolov8s> (AGPL-3.0)
+- `aquarium_marine` — Aquarium RT-DETR: <https://huggingface.co/Kanagavel/aquarium-rtdetr> (AGPL-3.0)
+- `underwater_fish` — Grayscale fish detector (NOAA): <https://huggingface.co/akridge/yolo8-fish-detector-grayscale> (US Gov. work / royalty-free)
+- `aquarium_axera` — Axera NPU export (registered as INCOMPATIBLE): <https://huggingface.co/AXERA-TECH/YOLOv8-Aquarium>

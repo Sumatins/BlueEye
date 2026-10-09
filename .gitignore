@@ -177,6 +177,7 @@ models/*
 !models/custom/
 models/custom/*
 !models/custom/README.md
+!models/custom/registry.json
 !models/custom/registry.json.example
 stores/*
 !stores/.gitkeep

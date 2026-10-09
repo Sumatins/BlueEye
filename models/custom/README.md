@@ -41,8 +41,8 @@ weights: you place the `.pt` file yourself and describe it here.
    ```
 
 4. **Restart BlueEye.** The model now appears on the *Models* page, in the
-   *Detect* model selector, in `auto` mode, and in the CLI
-   (`--model <id>`).
+   *Detect* model selector and in the CLI (`--model <id>`). It joins `auto`
+   mode unless its entry sets `"auto": false`.
 
 ## Schema
 
@@ -54,15 +54,20 @@ weights: you place the `.pt` file yourself and describe it here.
 | `name` | ✅ | string | Friendly display name (shown on model cards). |
 | `weights` | ✅ | string | Path of the `.pt` file **relative to `models/`**. Absolute paths and `..` are rejected. |
 | `classes` | | array of string | Class names, in training order. |
-| `type` | | string | Must be `yolov8` (default). Other types are rejected. |
+| `type` | | string | `yolov8` (default) or `rtdetr` (opened with Ultralytics `RTDETR`). Any other type is rejected. |
 | `recommended_confidence` | | number | Threshold in `[0, 1]` used by `auto` mode (default `0.5`). |
 | `description` / `summary` | | string | Short text shown on cards and under the selector. |
 | `version` | | string | Your model's version, e.g. `"0.1"`. |
 | `source` | | string | Provenance, e.g. `"Trained in-house on a local dataset"`. |
 | `license` | | string | Licence of *your* weights. |
 | `category` | | string | Free-form grouping (`regional`, `custom`, …). |
-| `icon` | | string | Emoji for the card. |
+| `icon` | | string | Icon name for the card (emoji or Material Symbols name). |
 | `homepage` | | string | Link to a dataset/paper/repository. |
+| `architecture` | | string | Informational label shown on the card (defaults from `type`). |
+| `auto` | | boolean | Include in the `auto` selection (default `true`). Set `false` for optional / overlapping models. |
+| `habitat` | | string | e.g. `"Freshwater"`, `"Brackish / estuarine"`, `"Marine"`. |
+| `readiness` | | string | Force a status when no usable weights exist: `needs_training` or `incompatible`. |
+| `status_note` | | string | One-line honest note about provenance / limitations, shown on the card. |
 
 Example:
 
@@ -96,7 +101,10 @@ Example:
   `scripts/download_models.py` never fetches them.
 - **Live reload**: the file is re-read whenever it changes (restart not
   strictly required for the CLI; the web UI re-reads it on the next run).
-- **`auto` mode** includes every installed custom model.
+- **`auto` mode** includes every installed custom model whose `auto` is not
+  `false` (the default). The curated additions (`models/custom/registry.json`)
+  set `"auto": false`, so `auto` still runs only the two core models; use the
+  **`all`** selection — or pick the model explicitly — to run them.
 
 ## Testing your model
 

@@ -105,9 +105,10 @@ unpublished, or no public weights) are listed with reasons in
 
 ## Registering a trained model
 
-A model becomes visible everywhere (Models page, Detect selector, `auto` mode
-and the CLI) as soon as its weights exist and it is described in
-`models/custom/registry.json`. There is **no application code to change**.
+A model becomes visible everywhere (Models page, Detect selector and the CLI)
+as soon as its weights exist and it is described in
+`models/custom/registry.json`. It also runs in `auto` mode unless the entry
+sets `"auto": false`. There is **no application code to change**.
 See [`models/custom/README.md`](../models/custom/README.md) for the schema and
 [`models/custom/registry.json.example`](../models/custom/registry.json.example)
 for ready-to-edit Indian-biodiversity templates.

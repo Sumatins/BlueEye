@@ -185,6 +185,34 @@ or click **"Download model weights"** in the web UI sidebar.
 > marine-detect README and are excluded from version control (`models/*` is
 > git-ignored).
 
+### Additional (verified) aquatic models
+
+BlueEye can also run three **genuinely pretrained, publicly downloadable**
+aquatic detectors. They are optional and **opt-in** — `auto` still runs only
+the two core models. Fetch them (SHA-256-pinned) with:
+
+```bash
+python scripts/fetch_additional_models.py
+```
+
+| Model key | Classes | Architecture | Licence | Source |
+| --- | --- | --- | --- | --- |
+| `aquatic_brackish` | crab, fish, jellyfish, shrimp, small_fish, starfish | YOLOv8s | AGPL-3.0 | [dronefreak/brackish-yolov8s](https://huggingface.co/dronefreak/brackish-yolov8s) |
+| `aquarium_marine` | fish, jellyfish, penguin, puffin, shark, starfish, stingray | RT-DETR | AGPL-3.0 | [Kanagavel/aquarium-rtdetr](https://huggingface.co/Kanagavel/aquarium-rtdetr) |
+| `underwater_fish` | fish | YOLOv8n | US Gov. work (royalty-free) | [akridge/yolo8-fish-detector-grayscale](https://huggingface.co/akridge/yolo8-fish-detector-grayscale) |
+
+They are **not India-specific**; provenance limits are documented in
+[`docs/indian_biodiversity.md`](docs/indian_biodiversity.md). They appear in
+the **Models** page under *"Additional Indian Aquatic Species Models"*, and
+you can run them with `--model <key>` or the combined `--model all`. A
+candidate published only as Axera NPU files (`aquarium_axera`) is shown as
+**Incompatible**. Verify every model with a real inference test:
+
+```bash
+python -m app.main --verify-models
+```
+
+
 ## Indian Biodiversity Models
 
 BlueEye is being extended toward **Indian freshwater and coastal species**.
@@ -200,10 +228,15 @@ available is documented honestly:
 | Whale shark / rays / Olive Ridley | Arabian Sea / Bay of Bengal | generic `shark` / `ray` / `turtle` (MegaFauna) | group-level now; species-level needs training |
 | Octopus | Indian coastal waters | — | **needs training** |
 
-- **No Indian pretrained weights are shipped.** The public models that were
-  found (AquaYOLO, YOLO-Fish, Roboflow Universe projects) did not meet the bar
-  of a verifiable licence + known classes + YOLOv8 `.pt` + a trustworthy
-  download, so **none was integrated** — BlueEye does not fabricate a model.
+- **No Indian-species pretrained weights were found.** The public models that
+  were found (AquaYOLO, YOLO-Fish, Roboflow Universe projects) did not meet the
+  bar of a verifiable licence + known classes + YOLOv8 `.pt` + a trustworthy
+  download, so no Indian-species model is claimed. Three **general aquatic**
+  pretrained models were integrated instead (above) and are labelled as
+  non-Indian — BlueEye does not fabricate a species model.
+- **Honest per-model status** on the Models page and in `--list-models`:
+  *ready* (weights present **and** an inference test succeeds), *not installed*,
+  *needs training* (dataset/config only) or *incompatible* (e.g. NPU-only).
 - **Verified, licensed datasets** (DePondFi / Orange Chromide and the
   Underwater Species Dataset NR — both CC BY 4.0) are catalogued with their
   licences in [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md).
@@ -227,7 +260,7 @@ Open http://localhost:8501 and use the sidebar navigation:
 | --- | --- |
 | **Dashboard** | Welcome, quick actions, device/model status, stored statistics |
 | **Detect** | The 5-step workflow: upload → choose model → set confidence → **Detect Marine Life** → results |
-| **Models** | Model cards with friendly names, class lists, provenance and installed / not-installed status; download weights; add custom/regional models |
+| **Models** | Core model cards plus the *"Additional Indian Aquatic Species Models"* section (ready / not installed / needs training / incompatible, with a real inference check); download weights |
 | **Analytics** | Charts computed from your stored detections (top species, confidence distribution) |
 | **History** | Every finished run with inputs, models, thresholds and outputs; export/clear |
 | **About** | What BlueEye does, how it works, limitations and attribution |
@@ -286,8 +319,9 @@ dimensions and FPS are preserved; annotated MP4 + JSON report are written to
 ### Other CLI commands
 
 ```bash
-python -m app.main --list-models       # registry + availability + classes
-python -m app.main --download-models   # fetch missing weights
+python -m app.main --list-models       # registry + status + architecture + classes
+python -m app.main --verify-models     # load every model + run a real inference test
+python -m app.main --download-models   # fetch missing core weights
 python -m app.main --help
 ```
 
@@ -360,7 +394,7 @@ Settings come from environment variables or an optional `.env` file
 | --- | --- | --- |
 | `BLUEEYE_MODELS_DIR` | `models` | Where weights live |
 | `BLUEEYE_OUTPUTS_DIR` | `outputs` | Annotated files + reports |
-| `BLUEEYE_DEFAULT_MODEL` | `auto` | `auto` / `fish_inv` / `megafauna` |
+| `BLUEEYE_DEFAULT_MODEL` | `auto` | `auto` (core) / `all` / any registered model id |
 | `BLUEEYE_DEFAULT_CONFIDENCE` | `0.5` | UI slider default |
 | `BLUEEYE_DEVICE` | `auto` | `auto` / `cpu` / `cuda:0` |
 | `BLUEEYE_ENHANCEMENT` | `off` | Enhancement default |

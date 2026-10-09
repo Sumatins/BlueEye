@@ -39,7 +39,13 @@ from app.utils.validation import (
 logger = logging.getLogger(__name__)
 
 #: Friendly label for the "run every installed model" pseudo-selection.
-AUTO_LABEL = "Auto - all available models (broad coverage)"
+AUTO_LABEL = "Auto - core models (Fish & Invertebrates + MegaFauna)"
+
+#: Friendly label for the pseudo-selection that also runs the additional models.
+ALL_LABEL = "Every installed model (core + additional)"
+
+#: Registry categories that belong to the "additional aquatic species" set.
+ADDITIONAL_CATEGORIES = ("additional", "indian")
 
 #: Media kinds accepted by :func:`save_upload`.
 KINDS = ("image", "video")
@@ -150,6 +156,8 @@ def model_label(key: str, spec: ModelSpec | None, available: bool) -> str:
     """Human-friendly label used by selectors and cards."""
     if key == "auto":
         return AUTO_LABEL
+    if key == "all":
+        return ALL_LABEL
     if spec is None:
         return key
     label = spec.display_name
@@ -162,12 +170,24 @@ def model_description(key: str, spec: ModelSpec | None) -> str:
     """Short explanation shown under the model selector."""
     if key == "auto":
         return (
-            "Runs every installed model and merges the detections. The class "
+            "Runs the two core models and merges the detections. The class "
             "sets are disjoint, so results contain no duplicates."
+        )
+    if key == "all":
+        return (
+            "Runs every installed model, including the additional aquatic "
+            "models. Overlapping detections of the same class are merged."
         )
     if spec is None:
         return ""
     return spec.summary or spec.description
+
+
+def additional_specs(registry: dict[str, ModelSpec]) -> list[ModelSpec]:
+    """Specs that belong to the additional / Indian aquatic set."""
+    return [
+        spec for spec in registry.values() if spec.category in ADDITIONAL_CATEGORIES
+    ]
 
 
 def available_keys(detector: MarineDetector) -> list[str]:

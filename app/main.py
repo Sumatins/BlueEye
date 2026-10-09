@@ -68,10 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model",
         default=None,
-        help="Model selection: 'auto' (default) runs every available model and "
-        "merges the results. You can also pass the id of any registered model "
-        "(e.g. fish_inv, megafauna, or a custom / regional model id). "
-        "Run --list-models to see the available ids.",
+        help="Model selection: 'auto' (default) runs the core models "
+        "(fish_inv + megafauna); 'all' also runs the additional installed "
+        "models. You can also pass the id of any registered model (e.g. "
+        "fish_inv, megafauna, aquatic_brackish). Run --list-models to see "
+        "every id and its status.",
     )
     parser.add_argument(
         "--enhance",
@@ -92,6 +93,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Inference device: auto, cpu, cuda (auto uses CUDA when available).",
     )
     parser.add_argument("--list-models", action="store_true", help="Show registered models.")
+    parser.add_argument(
+        "--verify-models",
+        action="store_true",
+        help="Load every model and run a real inference test, then report status.",
+    )
     parser.add_argument(
         "--download-models",
         action="store_true",
@@ -127,16 +133,48 @@ def _print_stats(stats: dict) -> None:
 
 
 def _cmd_list_models(detector: MarineDetector) -> int:
+    labels = {
+        "ready": "READY",
+        "not_installed": "NOT INSTALLED",
+        "needs_training": "NEEDS TRAINING",
+        "incompatible": "INCOMPATIBLE",
+    }
     print("Registered models:\n")
     for entry in detector.model_status():
-        status = "available" if entry["available"] else "NOT DOWNLOADED"
+        status = labels.get(str(entry.get("status")), "?")
         print(f"  [{entry['key']}] {entry['name']} - {entry['description']}")
-        print(f"      status     : {status}")
-        print(f"      path       : {entry['path']}")
-        print(f"      recommended: {entry['recommended_confidence']}")
+        print(f"      status      : {status}")
+        print(f"      architecture: {entry.get('architecture')}")
+        print(f"      habitat     : {entry.get('habitat') or '-'}")
+        print(f"      path        : {entry['path']}")
+        print(f"      recommended : {entry['recommended_confidence']}")
+        if entry.get("license"):
+            print(f"      license     : {entry['license']}")
         if entry.get("classes"):
-            print(f"      classes    : {', '.join(entry['classes'])}")
+            print(f"      classes     : {', '.join(entry['classes'])}")
         print()
+    return EXIT_OK
+
+
+def _cmd_verify_models(detector: MarineDetector) -> int:
+    """Run a real load + inference smoke test for every registered model."""
+    labels = {
+        "ready": "READY",
+        "not_installed": "NOT INSTALLED",
+        "needs_training": "NEEDS TRAINING",
+        "incompatible": "INCOMPATIBLE",
+    }
+    print("Verifying each model with a real inference test...\n")
+    for entry in detector.model_status():
+        key = entry["key"]
+        result = detector.verify_model(key)
+        status = labels.get(str(result.get("status")), "?")
+        detail = f" - {result['error']}" if result.get("error") else ""
+        classes = ", ".join(result.get("classes") or entry.get("classes") or [])
+        print(f"  [{key}] {entry['name']}: {status}{detail}")
+        if classes and result.get("status") == "ready":
+            print(f"      classes: {classes}")
+    print()
     return EXIT_OK
 
 
@@ -257,6 +295,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.list_models:
             return _cmd_list_models(detector)
+        if args.verify_models:
+            return _cmd_verify_models(detector)
         if args.download_models:
             return _cmd_download_models(detector)
         if args.image and args.video:

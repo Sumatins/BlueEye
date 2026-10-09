@@ -66,19 +66,24 @@ The broader candidate list below is marine/general.
 | Fish species detector (Kaggle) | <https://www.kaggle.com/code/killa92/map-0-9-fish-species-detector-yolov11/input> | Notebook + weights; licence of the underlying images **not verified**. |
 | Indian seafood market species (research paper) | PMC article *"Species identification for Indian seafood markets"* | Peer-reviewed dataset for Indian seafood; check the paper's data-availability statement for access and licence. |
 
-### Why none was integrated
+### The integration bar (and what now passes it)
 
 A model may only be registered when **all** of the following are true:
 
 1. **Licence** permits use (and, if weights are redistributed, redistribution).
 2. **Class list** is known and documented — no invented species names.
-3. **Format** is a YOLOv8-compatible `.pt` (or convertible annotations).
+3. **Format** is a YOLO / RT-DETR-compatible checkpoint.
 4. **Provenance** can be stated on the Models page.
 5. It was **tested** through BlueEye's own pipeline.
 
-No candidate currently satisfies all five with evidence, so BlueEye keeps the
-*architecture* ready instead of shipping an unverified model. This is a
-deliberate integrity decision: a fake "India model" is worse than none.
+None of the Roboflow Universe candidates above states a verifiable licence
+*and* class list *and* public weights, so none is registered. Three **general
+aquatic** models from Hugging Face *do* pass all five and are now integrated
+as optional additions (`aquatic_brackish`, `aquarium_marine`,
+`underwater_fish`) — see
+[`indian_biodiversity.md`](indian_biodiversity.md). They are **not
+India-specific**. For Indian species the architecture stays ready rather than
+shipping a fake "India model".
 
 > **Tip:** Roboflow Universe datasets usually state a licence on the project
 > page (often CC BY 4.0). If you find one for Indian coastal species, verify
@@ -231,7 +236,8 @@ python -m streamlit run app/ui/streamlit_app.py     # Models page shows 🟢 Rea
 ```
 
 The model then appears automatically on the *Models* page, in the *Detect*
-selector, in `auto` mode and in the CLI — with no UI changes.
+selector and in the CLI — with no UI changes. It joins `auto` mode unless its
+entry sets `"auto": false`.
 
 ---
 

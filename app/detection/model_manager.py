@@ -42,6 +42,9 @@ ProgressCallback = Callable[[int, Optional[int]], None]
 #: (the real weights are ~87 MB each).
 _MIN_WEIGHT_BYTES = 1_000_000
 
+#: Maps :attr:`ModelSpec.loader` to the Ultralytics class that opens it.
+LOADERS: dict[str, str] = {"yolo": "YOLO", "rtdetr": "RTDETR"}
+
 
 class ModelError(Exception):
     """Base class for model-related failures with user-friendly messages."""
@@ -89,6 +92,21 @@ class ModelSpec:
     custom: bool = False
     #: Project / dataset homepage ("" when unknown).
     homepage: str = ""
+    #: Architecture label shown in the UI (informational only).
+    architecture: str = "YOLOv8 (Ultralytics)"
+    #: Ultralytics loader used to open these weights: "yolo" or "rtdetr".
+    loader: str = "yolo"
+    #: Whether the model takes part in the ``auto`` selection. Curated
+    #: additions default to opt-in (``False``) so ``auto`` keeps the exact
+    #: behaviour of the original two models.
+    auto: bool = True
+    #: Habitats this model targets, e.g. "Freshwater", "Brackish / estuarine".
+    habitat: str = ""
+    #: Explicit readiness override for models without usable weights:
+    #: ``"needs_training"`` or ``"incompatible"`` ("" derives it from disk).
+    readiness: str = ""
+    #: Honest one-line note about provenance / availability limits.
+    status_note: str = ""
 
     @property
     def short_description(self) -> str:
@@ -98,6 +116,17 @@ class ModelSpec:
     def is_downloadable(self) -> bool:
         """True when BlueEye knows an official URL for these weights."""
         return bool(self.url)
+
+    def readiness_status(self, available: bool) -> str:
+        """One of ``ready`` / ``not_installed`` / ``needs_training`` / ``incompatible``.
+
+        ``available`` is whether the weight file exists on disk. An explicit
+        :attr:`readiness` override always wins, so a model that BlueEye knows
+        cannot run yet is never reported as ready.
+        """
+        if self.readiness:
+            return self.readiness
+        return "ready" if available else "not_installed"
 
 
 #: Official weights published by the upstream marine-detect project.
@@ -124,6 +153,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
             license="AGPL-3.0-only (weights as published upstream)",
             homepage="https://github.com/Orange-OpenSource/marine-detect",
             icon="🐟",
+            habitat="Marine",
             classes=(
                 "fish",
                 "serranidae",
@@ -160,6 +190,7 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
             license="AGPL-3.0-only (weights as published upstream)",
             homepage="https://github.com/Orange-OpenSource/marine-detect",
             icon="🦈",
+            habitat="Marine",
             classes=("shark", "ray", "turtle"),
         ),
     )
@@ -274,9 +305,14 @@ def _parse_custom_entry(
         return None
 
     model_type = str(entry.get("type") or "yolov8").strip().lower()
-    if model_type != "yolov8":
-        _reject(f"model '{key}' has unsupported type {model_type!r} (only 'yolov8').")
+    loader_by_type = {"yolov8": "yolo", "yolo": "yolo", "rtdetr": "rtdetr"}
+    if model_type not in loader_by_type:
+        _reject(
+            f"model '{key}' has unsupported type {model_type!r} "
+            "(use 'yolov8' or 'rtdetr')."
+        )
         return None
+    loader = loader_by_type[model_type]
 
     raw_confidence = entry.get("recommended_confidence", 0.5)
     try:
@@ -292,6 +328,15 @@ def _parse_custom_entry(
         _reject(f"model '{key}' has an invalid 'classes' list.")
         return None
     classes = tuple(str(c) for c in raw_classes)
+
+    readiness = str(entry.get("readiness") or "").strip().lower()
+    if readiness not in {"", "ready", "not_installed", "needs_training", "incompatible"}:
+        _reject(f"model '{key}' has an invalid readiness {readiness!r}.")
+        return None
+
+    architecture = str(entry.get("architecture") or "").strip()
+    if not architecture:
+        architecture = "RT-DETR (Ultralytics)" if loader == "rtdetr" else "YOLOv8 (Ultralytics)"
 
     return ModelSpec(
         key=key,
@@ -309,6 +354,12 @@ def _parse_custom_entry(
         icon=str(entry.get("icon") or "🌊").strip() or "🌊",
         custom=True,
         homepage=str(entry.get("homepage") or "").strip(),
+        architecture=architecture,
+        loader=loader,
+        auto=bool(entry.get("auto", True)),
+        habitat=str(entry.get("habitat") or "").strip(),
+        readiness=readiness,
+        status_note=str(entry.get("status_note") or "").strip(),
     )
 
 
@@ -427,16 +478,24 @@ class ModelManager:
             )
 
         try:
-            from ultralytics import YOLO
+            import ultralytics
         except ImportError as exc:  # pragma: no cover - dependency guard
             raise ModelError(
                 "The 'ultralytics' package is not installed. "
                 "Install dependencies with 'pip install -r requirements.txt'."
             ) from exc
 
+        loader_name = LOADERS.get(spec.loader, "YOLO")
+        model_cls = getattr(ultralytics, loader_name, None)
+        if model_cls is None:  # pragma: no cover - dependency guard
+            raise ModelError(
+                f"This Ultralytics build has no '{loader_name}' loader, which "
+                f"model '{spec.display_name}' needs. Update ultralytics."
+            )
+
         started = time.perf_counter()
         try:
-            model = YOLO(str(path))
+            model = model_cls(str(path))
         except Exception as exc:  # noqa: BLE001 - surfaced as a friendly error
             raise ModelError(
                 f"Failed to load model '{spec.display_name}' from {path}: {exc}"
@@ -451,6 +510,36 @@ class ModelManager:
         model = self.load(key)
         names = getattr(model, "names", {}) or {}
         return {int(idx): str(name) for idx, name in names.items()}
+
+    def auto_models(self) -> list[ModelSpec]:
+        """Available models that take part in the ``auto`` selection."""
+        return [spec for spec in self.available_models() if spec.auto]
+
+    def verify(self, key: str) -> dict[str, Any]:
+        """Real load + inference smoke test for one optional model.
+
+        Returns ``{"status", "ok", "error", "classes"}`` where ``status`` is
+        one of ``ready`` / ``not_installed`` / ``needs_training`` /
+        ``incompatible``. It never raises: a broken optional model must not
+        break the rest of the application.
+        """
+        import numpy as np
+
+        spec = self.get_spec(key)
+        if spec.readiness:
+            return {"status": spec.readiness, "ok": False, "error": None, "classes": []}
+        if not self.is_available(key):
+            return {"status": "not_installed", "ok": False, "error": None, "classes": []}
+        try:
+            model = self.load(key)
+            probe = np.zeros((64, 64, 3), dtype=np.uint8)
+            model.predict(probe, conf=0.99, device=self.device, verbose=False)
+        except Exception as exc:  # noqa: BLE001 - status must never crash
+            logger.warning("Inference verification failed for %s: %s", key, exc)
+            return {"status": "incompatible", "ok": False, "error": str(exc), "classes": []}
+        names = getattr(model, "names", {}) or {}
+        classes = [str(names[idx]) for idx in sorted(names)]
+        return {"status": "ready", "ok": True, "error": None, "classes": classes}
 
     def clear_cache(self) -> None:
         """Drop all loaded models (frees memory)."""

@@ -114,6 +114,27 @@ def status_badge(available: bool, loading: bool = False) -> str:
     return badge("Not installed", "off", dot=True)
 
 
+#: Display label + badge kind for each model readiness status.
+MODEL_STATUS_STYLE = {
+    "ready": ("Ready", "ok"),
+    "not_installed": ("Not installed", "off"),
+    "needs_training": ("Needs training", "warn"),
+    "incompatible": ("Incompatible", "warn"),
+}
+
+
+def model_status_badge(status: str, dot: bool = True) -> str:
+    """Badge for a model readiness status.
+
+    ``status`` is one of ``ready`` / ``not_installed`` / ``needs_training`` /
+    ``incompatible`` (see :meth:`ModelSpec.readiness_status`).
+    """
+    label, kind = MODEL_STATUS_STYLE.get(
+        status, (status.replace("_", " ").title() or "Unknown", "info")
+    )
+    return badge(label, kind, dot=dot)
+
+
 # --------------------------------------------------------------------------- #
 # Notices / states
 # --------------------------------------------------------------------------- #

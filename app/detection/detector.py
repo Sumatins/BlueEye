@@ -35,14 +35,20 @@ logger = logging.getLogger(__name__)
 #: Built-in shortcuts for the "model selection" parameter. Any key that is
 #: present in the registry (built-in *or* user-registered custom / regional
 #: model) is also accepted directly - see :meth:`MarineDetector.resolve_keys`.
-MODEL_SELECTIONS = ("auto", "fish_inv", "megafauna")
+MODEL_SELECTIONS = ("auto", "all", "fish_inv", "megafauna")
+
+#: Pseudo-selection that runs **every** installed model (including the
+#: opt-in additional models). ``auto`` keeps running only the core models.
+ALL_SELECTION = "all"
 
 #: Aliases accepted for convenience.
 _SELECTION_ALIASES = {
     "auto": "auto",
     "both": "auto",
-    "all": "auto",
-    "combined": "auto",
+    "all": ALL_SELECTION,
+    "everything": ALL_SELECTION,
+    "combined": ALL_SELECTION,
+    "full": ALL_SELECTION,
     "fish": "fish_inv",
     "fish_inv": "fish_inv",
     "fishinv": "fish_inv",
@@ -51,6 +57,26 @@ _SELECTION_ALIASES = {
     "mega": "megafauna",
     "megafauna": "megafauna",
 }
+
+#: Two detections from *different* models are treated as duplicates when they
+#: have the same class name and overlap by more than this IoU. This keeps the
+#: combined ("all") mode from double-reporting the same animal.
+_DUPLICATE_IOU = 0.7
+
+
+def _iou(box_a, box_b) -> float:
+    """Intersection-over-union of two ``(x1, y1, x2, y2)`` boxes."""
+    ax1, ay1, ax2, ay2 = box_a
+    bx1, by1, bx2, by2 = box_b
+    inter_w = max(0, min(ax2, bx2) - max(ax1, bx1))
+    inter_h = max(0, min(ay2, by2) - max(ay1, by1))
+    inter = inter_w * inter_h
+    if inter == 0:
+        return 0.0
+    area_a = max(0, ax2 - ax1) * max(0, ay2 - ay1)
+    area_b = max(0, bx2 - bx1) * max(0, by2 - by1)
+    union = area_a + area_b - inter
+    return inter / union if union else 0.0
 
 
 class MarineDetector:
@@ -119,15 +145,20 @@ class MarineDetector:
                 f"Choose 'auto' or one of the registered models: {known}."
             )
 
-        if normalized == "auto":
-            available = [spec.key for spec in self.model_manager.available_models()]
+        if normalized in ("auto", ALL_SELECTION):
+            specs = list(self.model_manager.available_models())
+            if normalized == "auto":
+                # ``auto`` keeps the original behaviour: the core models
+                # only. Additional (opt-in) models have ``auto=False``.
+                specs = [spec for spec in specs if getattr(spec, "auto", True)]
+            available = [spec.key for spec in specs]
             if not available:
                 raise ModelNotAvailableError(
                     "No model weights found. Download them with "
                     "'python scripts/download_models.py' or via the download "
                     "button in the web UI, then try again."
                 )
-            logger.info("Model selection 'auto' -> models: %s", ", ".join(available))
+            logger.info("Model selection '%s' -> models: %s", normalized, ", ".join(available))
             return available
 
         if not self.model_manager.is_available(normalized):
@@ -234,6 +265,9 @@ class MarineDetector:
                     )
                 )
 
+        if len(keys) > 1 and detections:
+            detections = self._suppress_duplicates(detections)
+
         elapsed_ms = (time.perf_counter() - started) * 1000.0
         logger.info(
             "Detected %d object(s) in %s using [%s] in %.0f ms",
@@ -253,6 +287,26 @@ class MarineDetector:
             image_height=height,
             enhanced=enhanced,
         )
+
+    @staticmethod
+    def _suppress_duplicates(detections: list[Detection]) -> list[Detection]:
+        """Drop same-class boxes that two models both reported for one object.
+
+        Only detections coming from *different* models are compared, and only
+        when the class names match, so genuinely distinct species are never
+        merged. The highest-confidence box is kept.
+        """
+        kept: list[Detection] = []
+        for det in sorted(detections, key=lambda item: item.confidence, reverse=True):
+            duplicate = any(
+                other.model != det.model
+                and other.class_name == det.class_name
+                and _iou(other.bbox, det.bbox) >= _DUPLICATE_IOU
+                for other in kept
+            )
+            if not duplicate:
+                kept.append(det)
+        return kept
 
     def predict_frame(
         self,
@@ -305,6 +359,19 @@ class MarineDetector:
     # ------------------------------------------------------------------ #
     # Introspection
     # ------------------------------------------------------------------ #
+    def verify_model(self, key: str) -> dict[str, Any]:
+        """Run a real inference smoke test for ``key`` (never raises).
+
+        Returns ``{"status", "ok", "error", "classes"}``; see
+        :meth:`app.detection.model_manager.ModelManager.verify`.
+        """
+        verify = getattr(self.model_manager, "verify", None)
+        if callable(verify):
+            return verify(key)
+        available = self.model_manager.is_available(key)
+        return {"status": "ready" if available else "not_installed", "ok": available,
+                "error": None, "classes": []}
+
     def model_status(self) -> list[dict[str, Any]]:
         """Per-model status used by the CLI and the UI.
 
@@ -321,8 +388,16 @@ class MarineDetector:
                 "name": spec.display_name,
                 "description": spec.description,
                 "available": available,
+                "status": spec.readiness_status(available),
                 "recommended_confidence": spec.recommended_confidence,
                 "path": str(self.model_manager.resolve_path(spec.key)),
+                "architecture": spec.architecture,
+                "loader": spec.loader,
+                "habitat": spec.habitat,
+                "auto": spec.auto,
+                "custom": spec.custom,
+                "license": spec.license,
+                "source": spec.source,
                 "classes": [],
             }
             if available:

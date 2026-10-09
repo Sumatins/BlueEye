@@ -37,6 +37,7 @@ from app.ui.components import (
     hero,
     kv,
     metrics_row,
+    model_status_badge,
     notice,
     species_chart,
     status_badge,
@@ -120,7 +121,7 @@ def _download_all(detector: MarineDetector) -> None:
 def _selection_guard(detector: MarineDetector) -> str | None:
     """Return a user-facing error message when the selection cannot run."""
     selection = st.session_state.get("model_selection", "auto")
-    if selection == "auto":
+    if selection in ("auto", "all"):
         if not state.any_model_available(detector):
             return "No model weights are installed."
         return None
@@ -137,7 +138,7 @@ def _selection_guard(detector: MarineDetector) -> str | None:
 def _model_step(detector: MarineDetector) -> None:
     """Step 2 - friendly model selection driven by the registry."""
     registry = state.registry(detector)
-    options = ["auto", *registry.keys()]
+    options = ["auto", "all", *registry.keys()]
     selection = st.session_state.get("model_selection", "auto")
     if selection not in options:  # a custom model may have been removed
         st.session_state["model_selection"] = "auto"
@@ -150,12 +151,16 @@ def _model_step(detector: MarineDetector) -> None:
         index=options.index(selection),
         key="model_selection",
         format_func=lambda key: state.model_label(
-            key, registry.get(key), detector.model_manager.is_available(key)
-            if key != "auto" else True
+            key,
+            registry.get(key),
+            True
+            if key in ("auto", "all")
+            else detector.model_manager.is_available(key),
         ),
         help=(
-            "'Auto' runs every installed model and merges the detections. "
-            "The class sets are disjoint, so results contain no duplicates."
+            "'Auto' runs the two core models. 'Every installed model' also "
+            "runs the additional aquatic models; overlapping detections of "
+            "the same class are merged, so results contain no duplicates."
         ),
         width="stretch",
     )
@@ -167,20 +172,33 @@ def _model_info_card(detector: MarineDetector, registry: dict) -> None:
     key = st.session_state.get("model_selection", "auto")
     description = state.model_description(key, registry.get(key))
 
-    if key == "auto":
-        ready_keys = state.available_keys(detector)
+    if key in ("auto", "all"):
+        if key == "all":
+            ready_keys = state.available_keys(detector)
+        else:
+            auto_models = getattr(detector.model_manager, "auto_models", None)
+            ready_keys = (
+                [spec.key for spec in auto_models()]
+                if callable(auto_models)
+                else state.available_keys(detector)
+            )
         names = [registry[k].display_name for k in ready_keys if k in registry]
         status = status_badge(bool(names))
         meta = chips(names) if names else ""
         meta += f'<span class="be-chip">{len(names)} ready</span>'
-        title, icon = "Auto - all available models", "done_all"
+        title = (
+            "Auto - core models"
+            if key == "auto"
+            else "Every installed model (core + additional)"
+        )
+        icon = "done_all"
     else:
         spec = registry.get(key)
         if spec is None:  # defensive: selection was validated above
             st.caption(description)
             return
         available = detector.model_manager.is_available(key)
-        status = status_badge(available)
+        status = model_status_badge(spec.readiness_status(available))
         parts = [f"{len(spec.classes)} classes"]
         if spec.recommended_confidence:
             parts.append(f"threshold {spec.recommended_confidence:.3f}")
