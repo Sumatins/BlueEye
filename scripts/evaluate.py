@@ -33,7 +33,7 @@ from app.utils.file_utils import unique_output_path  # noqa: E402
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Evaluate a marine-life detector (precision/recall/mAP).",
+        description="Evaluate an aquatic-life detector (precision/recall/mAP).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--weights", required=True, help="Path to the .pt checkpoint.")

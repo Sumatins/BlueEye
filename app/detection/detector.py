@@ -1,4 +1,4 @@
-"""BlueEye marine-life detector: the single inference entry point.
+"""BlueEye aquatic-life detector: the single inference entry point.
 
 ``MarineDetector`` hides model loading, device selection, per-model
 confidence thresholds and result construction behind a small interface:
@@ -80,7 +80,7 @@ def _iou(box_a, box_b) -> float:
 
 
 class MarineDetector:
-    """YOLOv8-based marine-life detector.
+    """YOLOv8 / RT-DETR-based aquatic-life detector.
 
     Parameters
     ----------

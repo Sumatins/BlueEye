@@ -107,6 +107,10 @@ class ModelSpec:
     readiness: str = ""
     #: Honest one-line note about provenance / availability limits.
     status_note: str = ""
+    #: Evaluation metrics measured on a held-out test set, as ordered
+    #: ``(label, value)`` pairs (e.g. ``("mAP@50", "0.83")``). Empty when no
+    #: metrics were measured - BlueEye never invents evaluation numbers.
+    metrics: tuple[tuple[str, str], ...] = ()
 
     @property
     def short_description(self) -> str:
@@ -338,6 +342,14 @@ def _parse_custom_entry(
     if not architecture:
         architecture = "RT-DETR (Ultralytics)" if loader == "rtdetr" else "YOLOv8 (Ultralytics)"
 
+    raw_metrics = entry.get("metrics") or {}
+    metrics: list[tuple[str, str]] = []
+    if isinstance(raw_metrics, dict):
+        for metric_key, metric_value in raw_metrics.items():
+            if metric_value is None or str(metric_value).strip() == "":
+                continue
+            metrics.append((str(metric_key), str(metric_value)))
+
     return ModelSpec(
         key=key,
         display_name=name,
@@ -360,6 +372,7 @@ def _parse_custom_entry(
         habitat=str(entry.get("habitat") or "").strip(),
         readiness=readiness,
         status_note=str(entry.get("status_note") or "").strip(),
+        metrics=tuple(metrics),
     )
 
 

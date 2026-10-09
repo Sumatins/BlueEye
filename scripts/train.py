@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Train / fine-tune a YOLOv8 marine-life detector on your own dataset.
+"""Train / fine-tune a YOLOv8 aquatic-life detector on your own dataset.
 
 BlueEye works out of the box with the pretrained marine-detect weights;
 training is optional and only needed when you add new data or species.

@@ -2,7 +2,7 @@
 
 Examples
 --------
-Detect marine life in an image (uses each model's recommended threshold)::
+Detect aquatic life in an image (uses each model's recommended threshold)::
 
     python -m app.main --image sample.jpg
 
@@ -51,8 +51,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m app.main",
         description=(
-            "BlueEye - AI-powered marine life detection for underwater "
-            "images and videos (YOLOv8 / PyTorch / OpenCV)."
+            "BlueEye - AI-assisted aquatic animal detection for underwater "
+            "images and supported videos (YOLOv8 / RT-DETR / PyTorch / OpenCV)."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -216,7 +216,7 @@ def _run_image(args: argparse.Namespace, detector: MarineDetector) -> int:
         print(f"Threshold : {threshold:g}")
     print(f"Enhanced  : {'yes' if result.enhanced else 'no'}")
     print(f"Time      : {result.elapsed_seconds:.2f} s")
-    print("\nDetected marine life:")
+    print("\nDetected aquatic life:")
     _print_detections(result.detection.sorted_detections())
     _print_stats(result.stats)
     print(f"\nAnnotated image : {result.output_path}")
@@ -269,7 +269,7 @@ def _run_video(args: argparse.Namespace, detector: MarineDetector) -> int:
     print(f"Enhanced  : {'yes' if result.enhanced else 'no'}")
     print(f"Time      : {result.elapsed_seconds:.2f} s ({result.processing_fps:.1f} fps)")
 
-    print("\nDetected marine life (aggregated over all frames):")
+    print("\nDetected aquatic life (aggregated over all frames):")
     _print_stats(result.statistics)
     print(f"\nAnnotated video : {result.output_path}")
     if result.report_path:

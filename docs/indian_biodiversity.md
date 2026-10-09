@@ -145,6 +145,26 @@ automatically and none is committed to Git.
 > derived from a dataset. Dataset licences and model-weight licences are not
 > the same thing.
 
+### 3.1 Downloadability audit (October 2026)
+
+The licences above are real, but a licence alone is not a dataset. A direct
+check of the two Mendeley records found **two concrete blockers** that stop a
+genuine training run today:
+
+| Dataset | What was tested | Result |
+|---|---|---|
+| DePondFi / Orange Chromide | Mendeley public API `…/datasets/7w45jx35hd/files?folder_id=root&version=1` and the page's "Download All" control | The API returns **no files** and "Download All" is **disabled**; the 586 images + labels are not served to anonymous users. **Blocked** until the authors enable public download or the data is obtained directly. |
+| Underwater Species Dataset (NR) | Downloaded the published archive (`NR Underwater Species.rar`, 96,651,036 B, sha256 `8840ce88…da258c`) and unpacked it with the 7-Zip RAR codec | The archive contains **1,728 images only** (train 1,291 / valid 294 / test 143) and **no YOLO `.txt` label files** and no `data.yaml`. Filenames hint at the 7 classes (octopus, seals, seahorse, sea turtles, sharks, whales, frame) but without annotations it **cannot** be used for supervised training as-is. **Blocked** until annotations are published or the images are re-annotated. |
+
+Neither blocker is hidden inside the app: `freshwater_fish` and
+`indian_marine` stay reported as **NEEDS TRAINING**, exactly as they are. When
+usable annotations become available, [`scripts/prepare_dataset.py`](../scripts/prepare_dataset.py)
+validates the class list and lays the data out for
+[`scripts/train.py`](../scripts/train.py) — it refuses a dataset that has
+images but no labels, so an unlabelled archive can never be mistaken for a
+trainable one.
+
+
 ---
 
 ## 4. How a new model plugs in (no application code changes)
@@ -217,6 +237,10 @@ Dataset config templates live in [`training/`](../training/README.md), one per
 target. The workflow is:
 
 ```bash
+# 0. Validate + lay out a downloaded, licensed dataset (refuses unlabelled data)
+python scripts/prepare_dataset.py --source "D:/data/pond_fish" \
+    --name freshwater_fish --classes fish
+
 # train (transfer-learning from the existing weights, or a small backbone)
 python scripts/train.py --data training/datasets/freshwater_fish.yaml \
     --model models/fish_inv/FishInv.pt --epochs 100 --imgsz 640 --batch 16
@@ -248,6 +272,14 @@ Because underwater imagery differs strongly from ordinary photographs,
 - The freshwater pond dataset available today (DePondFi/Orange Chromide) is
   **single-species** (`Etroplus maculatus`); it does not provide a general
   Indian freshwater fish classifier.
+- **Neither candidate dataset is downloadable as labelled training data today**
+  (see §3.1): DePondFi's files are not served to anonymous users, and the NR
+  archive ships images without annotations. This — not a lack of code — is why
+  `freshwater_fish` and `indian_marine` remain **NEEDS TRAINING**.
+- **Compute:** the environment this was verified in has **no CUDA GPU** (8 CPU
+  cores, ~7.7 GB RAM, `torch … +cpu`). Even with annotations, five 100-epoch
+  runs would be impractical here; a GPU (or a reduced schedule documented in
+  the training run) is the next required resource.
 - Gangetic dolphin, freshwater turtle and gharial have **no verified,
   licensed, ready-to-train detection dataset** found here; they need field /
   UAV imagery to be collected and annotated.

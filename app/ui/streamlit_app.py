@@ -35,16 +35,17 @@ from app.ui.pages import (  # noqa: E402
     history_page,
     models,
 )
-from app.ui.components import status_badge  # noqa: E402
 from app.ui.icons import span  # noqa: E402
-from app.ui.theme import PAGES, apply_theme  # noqa: E402
+from app.ui.theme import DETECT_PAGES, PAGES, apply_theme  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 #: Page id -> module exposing ``render(detector, settings)``.
+#: ``detect_image`` / ``detect_video`` share the Detect workflow module.
 PAGE_MODULES = {
     "dashboard": dashboard,
-    "detect": detect,
+    "detect_image": detect,
+    "detect_video": detect,
     "models": models,
     "analytics": analytics,
     "history": history_page,
@@ -69,7 +70,7 @@ def _sidebar(detector, settings) -> str:
             '<div class="be-brand"><div class="row">'
             f'<div class="mark">{span("visibility")}</div>'
             '<div><p class="n">BlueEye</p>'
-            '<p class="t">AI-Powered Marine Life Detection</p></div></div>'
+            '<p class="t">See beneath the surface</p></div></div>'
             '<div class="be-brand-rule"></div></div>',
             unsafe_allow_html=True,
         )
@@ -97,47 +98,43 @@ def _sidebar(detector, settings) -> str:
 
 
 def _sidebar_status(detector) -> None:
-    """Compact model/device status, with a download action when empty."""
-    registry = state.registry(detector)
-    ready = set(state.available_keys(detector))
+    """One compact readiness indicator.
+
+    The individual model names, counts and badges deliberately live on the
+    Models page only (single source of truth); the sidebar keeps just enough
+    signal to know whether inference can run, plus the download action when
+    nothing is installed yet.
+    """
+    if state.available_keys(detector):
+        st.markdown(
+            '<div class="be-side-status be-side-status--ok">'
+            f'{span("check_circle")}<span>Inference ready</span></div>',
+            unsafe_allow_html=True,
+        )
+        st.caption("Model availability, classes and licences are on the Models page.")
+        return
 
     st.markdown(
-        f'<div class="be-side-head">{span("monitoring")}<span>System status</span></div>',
+        '<div class="be-side-status be-side-status--warn">'
+        f'{span("error")}<span>No models installed</span></div>',
         unsafe_allow_html=True,
     )
-    st.caption(f"Device: `{detector.device}` · models ready: {len(ready)}/{len(registry)}")
-
-    rows = "".join(
-        f"<div style='margin:.15rem 0'>{status_badge(True)} "
-        f"<span style='color:#dcebf6;font-size:.86rem'>{spec.display_name}</span></div>"
-        for key, spec in registry.items()
-        if key in ready
-    )
-    st.markdown(rows, unsafe_allow_html=True)
-
-    extra = len(registry) - len(ready)
-    if extra:
-        st.caption(
-            f"+{extra} additional / not-installed model(s) — see the Models page."
-        )
-
-    if not ready:
-        if st.button(
-            "Download model weights",
-            type="primary",
-            icon=":material/download:",
-            width="stretch",
-            key="sidebar_download",
-        ):
-            try:
-                with st.spinner("Downloading model weights (~87 MB per model)..."):
-                    detector.model_manager.download_all()
-                st.cache_resource.clear()
-                st.rerun()
-            except ModelError as exc:
-                logger.warning("Model download failed: %s", exc)
-                st.error(str(exc))
-        st.caption("Or run `python scripts/download_models.py` in the project directory.")
+    if st.button(
+        "Download model weights",
+        type="primary",
+        icon=":material/download:",
+        width="stretch",
+        key="sidebar_download",
+    ):
+        try:
+            with st.spinner("Downloading model weights (~87 MB per model)..."):
+                detector.model_manager.download_all()
+            st.cache_resource.clear()
+            st.rerun()
+        except ModelError as exc:
+            logger.warning("Model download failed: %s", exc)
+            st.error(str(exc))
+    st.caption("Or run `python scripts/download_models.py` in the project directory.")
 
 
 # --------------------------------------------------------------------------- #
@@ -145,7 +142,7 @@ def _sidebar_status(detector) -> None:
 # --------------------------------------------------------------------------- #
 def main() -> None:
     st.set_page_config(
-        page_title="BlueEye - AI Marine Life Detection",
+        page_title="BlueEye - Aquatic Life Detection",
         page_icon=":material/waves:",
         layout="wide",
         initial_sidebar_state="expanded",
@@ -157,12 +154,19 @@ def main() -> None:
     state.init_session(settings)
 
     page = _sidebar(detector, settings)
+
+    # "Detect Image" / "Detect Video" are two entry points into the one
+    # Detect workflow; preselect the media type before the page renders.
+    media = DETECT_PAGES.get(page)
+    if media:
+        st.session_state["detect_media"] = media
+
     module = PAGE_MODULES.get(page, dashboard)
     module.render(detector, settings)
 
     st.divider()
     st.caption(
-        f"BlueEye v{__version__} · AI-Powered Marine Life Detection · "
+        f"BlueEye v{__version__} · See beneath the surface · "
         "built on marine-detect (Orange OpenSource, AGPL-3.0-only)."
     )
 

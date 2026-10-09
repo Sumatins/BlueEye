@@ -22,9 +22,14 @@ import html
 import streamlit as st
 
 #: Ordered navigation entries: (page id, label, Material icon name).
+#:
+#: ``detect_image`` and ``detect_video`` both open the same Detect workflow
+#: with the matching media type preselected, so the sidebar can offer direct
+#: "Detect Image" / "Detect Video" entry points without duplicating code.
 PAGES: tuple[tuple[str, str, str], ...] = (
     ("dashboard", "Dashboard", "home"),
-    ("detect", "Detect", "search"),
+    ("detect_image", "Detect Image", "image"),
+    ("detect_video", "Detect Video", "videocam"),
     ("models", "Models", "psychology"),
     ("analytics", "Analytics", "bar_chart"),
     ("history", "History", "history"),
@@ -34,11 +39,15 @@ PAGES: tuple[tuple[str, str, str], ...] = (
 #: Sidebar section grouping: (section title, page ids in display order).
 #: The ids must match :data:`PAGES`; section headers are rendered by CSS.
 NAV_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Overview", ("dashboard", "detect")),
+    ("Overview", ("dashboard", "detect_image", "detect_video")),
     ("AI and data", ("models", "analytics")),
     ("Activity", ("history",)),
     ("Information", ("about",)),
 )
+
+#: Page ids that render the shared Detect workflow and the media type each
+#: one preselects. Consumed by the application shell.
+DETECT_PAGES: dict[str, str] = {"detect_image": "Image", "detect_video": "Video"}
 
 #: Widget label of the Detect page media selector (CSS hooks the segmented
 #: control by this aria-label - keep it in sync with detect.py).
@@ -383,6 +392,26 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
   margin: .2rem 0 .35rem;
 }
 .be-side-head .be-ic { color: #67e8f9; font-size: .95rem; }
+
+/* Compact single-line readiness indicator (model detail lives on Models). */
+.be-side-status {
+  display: flex; align-items: center; gap: .45rem;
+  font-size: .84rem; font-weight: 600;
+  border-radius: 9px; padding: .4rem .6rem; margin: .2rem 0 .35rem;
+}
+.be-side-status .be-ic { font-size: 1rem; }
+.be-side-status--ok {
+  color: #7ff0cf;
+  background: rgba(16, 185, 129, .13);
+  border: 1px solid rgba(16, 185, 129, .28);
+}
+.be-side-status--ok .be-ic { color: #7ff0cf; }
+.be-side-status--warn {
+  color: #ffd9a1;
+  background: rgba(234, 179, 8, .13);
+  border: 1px solid rgba(234, 179, 8, .3);
+}
+.be-side-status--warn .be-ic { color: #f6c86a; }
 
 /* ------------------------------------------------------------------ */
 /* Segmented control (Detect page media selector)                      */

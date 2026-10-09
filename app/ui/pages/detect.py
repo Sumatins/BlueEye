@@ -59,8 +59,8 @@ def render(detector: MarineDetector, settings) -> None:
     hero(
         st,
         "Detection",
-        "Marine Detection",
-        "Analyze underwater images and videos using AI.",
+        "Aquatic Detection",
+        "Identify aquatic animals in underwater images and supported videos.",
         icon="center_focus_strong",
     )
 
@@ -139,16 +139,16 @@ def _model_step(detector: MarineDetector) -> None:
     """Step 2 - friendly model selection driven by the registry."""
     registry = state.registry(detector)
     options = ["auto", "all", *registry.keys()]
-    selection = st.session_state.get("model_selection", "auto")
-    if selection not in options:  # a custom model may have been removed
+    # The key is seeded in init_session and may be set by the Models page's
+    # "Use this model" action, so validate it instead of forcing an index
+    # (passing index alongside a session-state value triggers a warning).
+    if st.session_state.get("model_selection", "auto") not in options:
         st.session_state["model_selection"] = "auto"
-        selection = "auto"
 
     step(st, 2, "Choose a model")
     st.selectbox(
         "Model",
         options=options,
-        index=options.index(selection),
         key="model_selection",
         format_func=lambda key: state.model_label(
             key,
@@ -304,7 +304,7 @@ def _image_workflow(detector: MarineDetector, settings) -> None:
             st,
             "image",
             "No media selected",
-            "Upload an underwater image to begin marine-life detection. "
+            "Upload an underwater image to begin aquatic-life detection. "
             "Example images are available in assets/images/input_folder/.",
         )
         _model_step(detector)
@@ -341,7 +341,7 @@ def _image_workflow(detector: MarineDetector, settings) -> None:
 
     st.write("")
     if st.button(
-        "Detect Marine Life",
+        "Detect Aquatic Life",
         type="primary",
         icon=":material/rocket_launch:",
         width="stretch",
@@ -453,7 +453,7 @@ def _render_image_results() -> None:
             "or enabling a different model.",
         )
     else:
-        st.markdown("### Detected marine life")
+        st.markdown("### Detected aquatic life")
         detection_table(st, detections)
         with st.expander("Species breakdown", expanded=True):
             species_chart(st, stats.get("detections_per_class", {}) or {})
@@ -511,7 +511,7 @@ def _video_workflow(detector: MarineDetector, settings) -> None:
             st,
             "videocam",
             "No media selected",
-            "Upload an underwater video to begin frame-by-frame marine-life "
+            "Upload an underwater video to begin frame-by-frame aquatic-life "
             "detection. Supported formats are shown in the upload area.",
         )
         _model_step(detector)
@@ -555,7 +555,7 @@ def _video_workflow(detector: MarineDetector, settings) -> None:
 
     st.write("")
     if st.button(
-        "Detect Marine Life",
+        "Detect Aquatic Life",
         type="primary",
         icon=":material/rocket_launch:",
         width="stretch",

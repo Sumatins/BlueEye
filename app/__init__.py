@@ -1,8 +1,8 @@
-"""BlueEye - AI-powered marine life detection and classification.
+"""BlueEye - AI-assisted aquatic animal detection and classification.
 
-BlueEye accepts underwater images and videos, runs YOLOv8 object detection,
-and produces annotated results, structured statistics and machine-readable
-JSON reports.
+BlueEye accepts underwater images and videos, runs YOLOv8 / RT-DETR object
+detection, and produces annotated results, structured statistics and
+machine-readable JSON reports.
 
 The detection pipeline is developed for the BlueEye project and is derived
 from the open-source ``marine-detect`` project by Orange Business Services SA

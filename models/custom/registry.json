@@ -78,7 +78,7 @@
       "summary": "Freshwater pond / river fish for Karnataka and South India.",
       "description": "Train with training/datasets/freshwater_fish.yaml.",
       "homepage": "https://data.mendeley.com/datasets/7w45jx35hd/1",
-      "status_note": "No trustworthy pretrained Indian freshwater-fish detector was found; train it and register the weights here."
+      "status_note": "No trustworthy pretrained Indian freshwater-fish detector was found; train it and register the weights here. Blocker (Oct 2026): the DePondFi files are not served by Mendeley's public API and its 'Download All' is disabled, so the annotations are not yet obtainable."
     },
     {
       "id": "gangetic_dolphin",
@@ -154,7 +154,7 @@
       "summary": "Species-level coastal model for whale shark, octopus, rays and Olive Ridley turtles.",
       "description": "Train with training/datasets/indian_marine.yaml.",
       "homepage": "https://data.mendeley.com/datasets/4tp83br92z/1",
-      "status_note": "Octopus is not covered by any built-in model; the built-in MegaFauna only covers shark/ray/turtle at group level."
+      "status_note": "Octopus is not covered by any built-in model; the built-in MegaFauna only covers shark/ray/turtle at group level. Blocker (Oct 2026): the published Mendeley archive (96.7 MB RAR) contains 1,728 images but NO YOLO label files, so it cannot be trained on as-is."
     },
     {
       "id": "aquarium_axera",

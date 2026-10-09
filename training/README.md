@@ -50,8 +50,12 @@ data/raw/<name>/
 ## The five-step workflow
 
 ```bash
-# 1. Fetch a licensed dataset and convert it to the YOLO layout above.
-#    (Sources and licences: docs/indian_biodiversity.md)
+# 1. Fetch a licensed dataset and validate/lay it out for YOLO.
+#    (Sources, licences and current blockers: docs/indian_biodiversity.md)
+python scripts/prepare_dataset.py \
+    --source "D:/data/pond_fish" --name freshwater_fish --classes fish
+#    -> refuses a dataset that has images but no label files, then writes
+#       data/raw/freshwater_fish/{images,labels}/{train,val,test} + data.yaml
 
 # 2. Train (transfer learning from the existing BlueEye weights, or a small
 #    Ultralytics backbone). Run from the project root:
@@ -96,6 +100,12 @@ a small model is possible but slow; a GPU is recommended.
 | Underwater Species Dataset (NR) | 7 marine classes incl. **octopus**, sharks, turtles | CC BY 4.0 | <https://data.mendeley.com/datasets/4tp83br92z/1> |
 | Community Fish Detection (CFD) | 1 class `fish`, ~2M images, multi-domain | per-dataset (CC/MIT) | <https://lila.science/datasets/community-fish-detection-dataset> |
 | Upstream FishInv / MegaFauna sets | Reef fish families + shark/ray/turtle | see upstream repo | <https://github.com/Orange-OpenSource/marine-detect> |
+
+> **Downloadability (Oct 2026).** A direct check found the DePondFi files are
+> **not served** by Mendeley's public API ("Download All" is disabled), and the
+> NR archive ships **only images, no label files**. Neither can be trained on
+> as-is; details in [`docs/indian_biodiversity.md`](../docs/indian_biodiversity.md) §3.1.
+> `scripts/prepare_dataset.py` will not accept an unlabelled dataset.
 
 Datasets that were researched but **not** integrated (no verifiable licence,
 unpublished, or no public weights) are listed with reasons in

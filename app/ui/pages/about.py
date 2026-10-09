@@ -49,8 +49,9 @@ def render(detector: MarineDetector, settings) -> None:
         st,
         "About the project",
         "BlueEye",
-        "AI-Powered Marine Life Detection - a deep-learning system that "
-        "identifies marine organisms in underwater images and videos.",
+        "See beneath the surface, understand aquatic life and support "
+        "biodiversity - an AI-assisted aquatic animal detection system for "
+        "underwater images and supported videos.",
         icon="info",
     )
 
@@ -58,7 +59,7 @@ def render(detector: MarineDetector, settings) -> None:
         st,
         [
             ("Version", __version__, "BlueEye release"),
-            ("Detector", "YOLOv8", "Ultralytics / PyTorch"),
+            ("Detector", "Ultralytics (YOLOv8 / RT-DETR)", "PyTorch"),
             ("Models", len(state.registry(detector)), "in the registry"),
             ("Device", str(detector.device).upper(), "auto-selected"),
         ],

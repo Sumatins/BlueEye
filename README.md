@@ -1,10 +1,11 @@
 # BlueEye
 
-**AI-Powered Marine Life Detection** — an end-to-end application that detects
-and classifies marine organisms in underwater images and videos using
-YOLOv8 deep learning.
+**See beneath the surface. Understand aquatic life. Support biodiversity.**
+BlueEye is an end-to-end, AI-assisted application that detects and classifies
+aquatic organisms in underwater images and supported videos using YOLOv8 /
+RT-DETR deep learning.
 
-> *"Detect and identify marine organisms from underwater images and videos
+> *"Detect and identify aquatic organisms from underwater images and videos
 > using deep learning."*
 
 BlueEye is an academic final-year engineering project (Department of CSE,
@@ -17,12 +18,12 @@ weights used here.
 
 ## Overview
 
-Marine ecosystems are difficult and expensive to monitor manually. Underwater
+Aquatic ecosystems are difficult and expensive to monitor manually. Underwater
 images suffer from low lighting, noise, colour distortion, blur and low
-visibility, and many marine species look very similar. BlueEye automates
+visibility, and many species look very similar. BlueEye automates
 species identification so that researchers can analyse large volumes of
 underwater imagery for **biodiversity monitoring, conservation, fisheries
-management and marine research**.
+management and aquatic research**.
 
 BlueEye accepts an image or a video, runs YOLOv8 object detection, draws
 labelled bounding boxes with confidence scores, and produces a results
@@ -30,11 +31,15 @@ dashboard with statistics and a machine-readable JSON report.
 
 ## Features
 
-- **Professional multi-page web UI** — Dashboard, Detect, Models, Analytics,
-  History and About, with a grouped sidebar, one consistent icon set
-  (Material Symbols Rounded), a deep-ocean design system, real metadata
-  cards, status badges, honest empty states, loading states, friendly error
-  cards and a responsive layout
+- **Aquatic-biodiversity dashboard** — a branded hero with real *Detect an
+  Image* / *Analyse a Video* actions, a "How BlueEye works" explainer, an
+  observation overview, recent detections and capability cards, all driven by
+  the real history store (never hard-coded numbers, no model loading on load)
+- **Professional multi-page web UI** — Dashboard, Detect Image, Detect Video,
+  Models, Analytics, History and About, with a compact grouped sidebar, one
+  consistent icon set (Material Symbols Rounded), a deep-ocean design system,
+  real metadata cards, status badges, honest empty states, loading states,
+  friendly error cards and a responsive layout
 - **Image detection** — upload JPG/JPEG/PNG/WEBP, get an annotated image back
   in a before/after view
 - **Video detection** — frame-by-frame processing of MP4/AVI/MOV/MKV into an
@@ -42,8 +47,11 @@ dashboard with statistics and a machine-readable JSON report.
   in-browser player
 - **Multiple detections per frame** — every organism gets a bounding box,
   species label and confidence percentage, shown as cards and a table
-- **Two pretrained models** — *Fish & Invertebrates* (15 classes) and
+- **Two original pretrained models** — *Fish & Invertebrates* (15 classes) and
   *MegaFauna* (shark / ray / turtle), selectable or combined (`Auto`)
+- **Additional pretrained models** — three verified, opt-in aquatic models
+  (brackish/estuarine, aquarium & reef, grayscale underwater fish); `Auto`
+  keeps running only the two core models, `Every installed model` runs them all
 - **Extensible model registry** — friendly model cards with real status
   labels (installed / not installed); new models (e.g. regional species) are added
   with a JSON entry + a `.pt` file, **no code changes** — see
@@ -203,7 +211,7 @@ python scripts/fetch_additional_models.py
 
 They are **not India-specific**; provenance limits are documented in
 [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md). They appear in
-the **Models** page under *"Additional Indian Aquatic Species Models"*, and
+the **Models** page under *"Additional pretrained models"*, and
 you can run them with `--model <key>` or the combined `--model all`. A
 candidate published only as Axera NPU files (`aquarium_axera`) is shown as
 **Incompatible**. Verify every model with a real inference test:
@@ -221,12 +229,12 @@ available is documented honestly:
 
 | Target | Habitat | Built-in coverage | Status |
 | --- | --- | --- | --- |
-| Freshwater fish | Freshwater ponds / rivers / reservoirs | — | **needs training** (DePondFi / Orange Chromide dataset, CC BY 4.0) |
+| Freshwater fish | Freshwater ponds / rivers / reservoirs | — | **needs training** (DePondFi / Orange Chromide dataset, CC BY 4.0 — files not publicly downloadable as of Oct 2026) |
 | Gangetic river dolphin | Ganga / Brahmaputra / Chambal | — | **needs data + training** |
 | Freshwater turtle | Indian rivers / lakes / ponds | generic `turtle` (MegaFauna) | **needs data + training** |
 | Gharial | clear, fast-flowing rivers | — | **needs data + training** |
 | Whale shark / rays / Olive Ridley | Arabian Sea / Bay of Bengal | generic `shark` / `ray` / `turtle` (MegaFauna) | group-level now; species-level needs training |
-| Octopus | Indian coastal waters | — | **needs training** |
+| Octopus | Indian coastal waters | — | **needs training** (NR archive ships images only, no labels) |
 
 - **No Indian-species pretrained weights were found.** The public models that
   were found (AquaYOLO, YOLO-Fish, Roboflow Universe projects) did not meet the
@@ -239,10 +247,16 @@ available is documented honestly:
   *needs training* (dataset/config only) or *incompatible* (e.g. NPU-only).
 - **Verified, licensed datasets** (DePondFi / Orange Chromide and the
   Underwater Species Dataset NR — both CC BY 4.0) are catalogued with their
-  licences in [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md).
+  licences **and a downloadability audit** in
+  [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md) §3.1. As of
+  October 2026 neither can be trained on as-is (DePondFi files are not served
+  to anonymous users; the NR archive contains images without label files), so
+  the five Indian targets stay **NEEDS TRAINING** rather than being faked.
 - **Ready-to-train configs** for each target are in
-  [`training/datasets/`](training/README.md): train with `scripts/train.py`,
-  evaluate with `scripts/evaluate.py`, then register the `.pt`.
+  [`training/datasets/`](training/README.md). Validate and lay out a downloaded
+  dataset with `scripts/prepare_dataset.py` (it refuses unlabelled data), train
+  with `scripts/train.py`, evaluate with `scripts/evaluate.py`, then register
+  the `.pt`.
 - **Freshwater and marine models are kept separate.** A model is only claimed
   to work for the environment it was trained on.
 
@@ -258,17 +272,21 @@ Open http://localhost:8501 and use the sidebar navigation:
 
 | Page | What it does |
 | --- | --- |
-| **Dashboard** | Welcome, quick actions, device/model status, stored statistics |
-| **Detect** | The 5-step workflow: upload → choose model → set confidence → **Detect Marine Life** → results |
-| **Models** | Core model cards plus the *"Additional Indian Aquatic Species Models"* section (ready / not installed / needs training / incompatible, with a real inference check); download weights |
+| **Dashboard** | Aquatic-biodiversity landing page: branding hero, real *Detect an Image* / *Analyse a Video* actions, "How BlueEye works", observation overview, recent detections, capability cards and a responsible-use note |
+| **Detect Image** | The detection workflow with the media type set to **Image**: upload → choose model → set confidence → **Detect** → results |
+| **Detect Video** | The same workflow with the media type set to **Video**, with a real frame-by-frame progress bar |
+| **Models** | The single source of truth: original / additional pretrained / locally trained / needs-training / incompatible models, readiness + habitat filters, real status and an inference check; download weights |
 | **Analytics** | Charts computed from your stored detections (top species, confidence distribution) |
 | **History** | Every finished run with inputs, models, thresholds and outputs; export/clear |
 | **About** | What BlueEye does, how it works, limitations and attribution |
 
 The sidebar groups the pages (*Overview* / *AI and data* / *Activity* /
-*Information*) and a single icon set — **Material Symbols Rounded**, bundled
-locally with Streamlit — is used across the sidebar, buttons, cards, model
-tiles and empty states. The whole interface is one consistent design system
+*Information*) and shows only a compact readiness indicator — **no individual
+model names or per-model badges**; the Models page is the single source of
+truth for model status. Hardware/device details live on the Models and About
+pages. A single icon set — **Material Symbols Rounded**, bundled locally with
+Streamlit — is used across the sidebar, buttons, cards, model tiles and empty
+states. The whole interface is one consistent design system
 (see [`app/ui/theme.py`](app/ui/theme.py) and [`app/ui/icons.py`](app/ui/icons.py)).
 
 The Detect page shows an original/result side-by-side view, a summary
@@ -289,7 +307,7 @@ python -m app.main --image photo.jpg --enhance      # optional enhancement
 Example output:
 
 ```
-Detected marine life:
+Detected aquatic life:
   1. Parrotfish (Scaridae)                87.9%   bbox=[294, 355, 486, 466]   model=fish_inv
   2. Parrotfish (Scaridae)                83.8%   bbox=[184, 282, 301, 332]   model=fish_inv
   3. Sea turtle                           69.5%   bbox=[28, 423, 542, 669]   model=megafauna
@@ -333,9 +351,22 @@ Exit codes: `0` success · `2` input/validation error · `3` model error ·
 Training is optional — BlueEye works with the pretrained weights out of the
 box.
 
+First validate and lay out a downloaded, licensed dataset (the helper refuses
+a dataset that has images but no YOLO label files, and never invents class
+names):
+
+```bash
+python scripts/prepare_dataset.py \
+    --source "D:/data/my_dataset" \
+    --name my_dataset \
+    --classes fish crab        # omit if the source ships a data.yaml
+```
+
+Then train:
+
 ```bash
 python scripts/train.py \
-    --data data/processed/my_dataset/data.yaml \
+    --data data/raw/my_dataset/data.yaml \
     --model yolov8n.pt \
     --epochs 50 --imgsz 640 --batch 16 --device cpu
 ```
@@ -343,7 +374,7 @@ python scripts/train.py \
 To fine-tune from an existing BlueEye model:
 
 ```bash
-python scripts/train.py --data data/processed/my_dataset/data.yaml \
+python scripts/train.py --data data/raw/my_dataset/data.yaml \
     --model models/fish_inv/FishInv.pt --epochs 30
 ```
 
@@ -351,6 +382,8 @@ For the **Indian-species** models, ready-made dataset configs ship in
 [`training/datasets/`](training/README.md):
 
 ```bash
+python scripts/prepare_dataset.py --source "D:/data/pond_fish" \
+    --name freshwater_fish --classes fish
 python scripts/train.py \
     --data training/datasets/freshwater_fish.yaml \
     --model models/fish_inv/FishInv.pt --epochs 100 --imgsz 640 --batch 16
@@ -358,14 +391,14 @@ python scripts/train.py \
 
 See [`training/README.md`](training/README.md) for the full per-target workflow
 and [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md) for datasets,
-licences and limitations.
+licences, the downloadability audit and limitations.
 
 ### Evaluation (Precision / Recall / mAP)
 
 ```bash
 python scripts/evaluate.py \
     --weights runs/detect/blueeye/best.pt \
-    --data data/processed/my_dataset/data.yaml \
+    --data data/raw/my_dataset/data.yaml \
     --split val --save-report
 ```
 
@@ -374,7 +407,8 @@ python scripts/evaluate.py \
 > your environment. The numbers published in the upstream marine-detect
 > README were measured by *its* authors on *their* test sets and are
 > reference values — they are not re-measured by BlueEye. No metric shown by
-> BlueEye is fabricated.
+> BlueEye is fabricated. The Models page shows an *Evaluation* row **only**
+> when a registry entry records real metrics.
 
 ## Dataset Format
 
@@ -383,7 +417,8 @@ See [`data/README.md`](data/README.md) for the expected YOLO layout,
 referenced in the BlueEye report (Shark, Shark Species, Zebra Shark, Fish,
 Count-a-Manta, OzFish, …). Ready-to-edit configs for the Indian-species
 models are in [`training/datasets/`](training/README.md). Datasets are never
-downloaded automatically.
+downloaded automatically; use `scripts/prepare_dataset.py` to validate and
+lay one out.
 
 ## Configuration
 
@@ -404,17 +439,20 @@ Settings come from environment variables or an optional `.env` file
 
 ### Model selection
 
-- **Auto** — runs *every* model whose weights are available and merges the
-  detections. The two built-in models have **disjoint class sets**
-  (fish/invertebrates vs. shark/ray/turtle), so merged results contain no
-  duplicate classes and no cross-model NMS is needed. Running both models
-  roughly doubles inference time — choose a single model for speed-critical
-  use.
+- **Auto** — runs the **two core models** *Fish & Invertebrates* and
+  *MegaFauna* whose weights are available and merges the detections. Their
+  class sets are **disjoint** (fish/invertebrates vs. shark/ray/turtle), so
+  merged results contain no duplicate classes and no cross-model NMS is
+  needed. Additional models are **opt-in** and never run under `Auto`.
+- **Every installed model** (`all`) — runs every model whose weights are
+  available (core + additional + custom), then removes cross-model duplicates
+  of the same class at IoU ≥ 0.7, keeping the highest-confidence box. This is
+  the slowest option.
 - **Fish & Invertebrates** / **MegaFauna** — run only that model.
-- **Any registered model** (built-in or a custom / regional one) can be
-  selected explicitly: pick it in Detect or pass its id to `--model`. If its
-  weights are missing, BlueEye shows a clear error and never disables the
-  other working models. Aliases (`fish`, `mega`) keep working.
+- **Any registered model** (built-in, additional or a custom / regional one)
+  can be selected explicitly: pick it in Detect or pass its id to `--model`.
+  If its weights are missing, BlueEye shows a clear error and never disables
+  the other working models. Aliases (`fish`, `mega`) keep working.
 
 ### Adding a model (registry)
 
@@ -498,11 +536,19 @@ pytest --cov=app       # with coverage
 - **Unit tests** — validation/sanitisation, statistics/report formatting,
   enhancement, model manager (downloads mocked, no network), detector
   confidence filtering & model selection, image/video pipelines (model mocked),
-  the detection history store, and the custom-model registry (discovery,
-  validation, path containment, fail-safe behaviour).
+  the detection history store, the custom-model registry (discovery,
+  validation, path containment, fail-safe behaviour), the dataset-preparation
+  helper (`scripts/prepare_dataset.py`, including its refusal of unlabelled
+  data) and the redesigned navigation / model-card metadata.
 - **Integration tests** — real weights on a real image and a real generated
   video; automatically **skipped** when weights are not downloaded and never
   require a GPU.
+
+Run the model self-check (loads each model and runs a real inference test):
+
+```bash
+python -m app.main --verify-models
+```
 
 ## Troubleshooting
 
@@ -543,16 +589,18 @@ blueeye/
 │   │   ├── file_utils.py           # safe paths, unique names, image/JSON I/O
 │   │   └── history.py              # persistent detection history + aggregates
 │   └── ui/
-│       ├── streamlit_app.py         # shell: navigation, sidebar, routing
+│       ├── streamlit_app.py         # shell: navigation, grouped sidebar, routing
 │       ├── theme.py                 # design system (ocean CSS, page ids, nav)
 │       ├── icons.py                 # single icon set (Material Symbols Rounded)
 │       ├── components.py            # reusable cards, badges, tables, notices
 │       ├── state.py                 # session state, upload intake, history
-│       └── pages/                   # Dashboard, Detect, Models, Analytics,
-│                                    # History, About
+│       └── pages/                   # Dashboard, Detect (Image/Video), Models,
+│                                    # Analytics, History, About
 ├── src/marine_detect/              # upstream reference code (AGPL-3.0, unmodified)
 ├── scripts/
 │   ├── download_models.py          # fetch official weights
+│   ├── fetch_additional_models.py  # fetch the additional verified models (SHA-256 pinned)
+│   ├── prepare_dataset.py          # validate + lay out a downloaded dataset
 │   ├── train.py                    # training / fine-tuning
 │   └── evaluate.py                 # precision / recall / mAP evaluation
 ├── training/
@@ -564,6 +612,7 @@ blueeye/
 ├── models/                         # weights (downloaded, git-ignored)
 │   ├── fish_inv/FishInv.pt
 │   ├── megafauna/MegaFauna.pt
+│   ├── additional/                 # verified opt-in aquatic models
 │   └── custom/                     # model extension point (registry.json)
 ├── data/                           # uploads + datasets (see data/README.md)
 ├── outputs/
@@ -583,12 +632,17 @@ blueeye/
 
 ## Limitations
 
-- The two pretrained models cover the **upstream species scope** (reef fish
-  families, five invertebrates, shark/ray/turtle) — other organisms will not
-  be detected until new data is trained in. In particular, no Indian
+- The two **original** pretrained models cover the **upstream species scope**
+  (reef fish families, five invertebrates, shark/ray/turtle) — other organisms
+  will not be detected until new data is trained in. In particular, no Indian
   freshwater or species-level coastal model is shipped; MegaFauna only gives
   the **group** `shark` / `ray` / `turtle`, and octopus is not covered at all
   (see [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md)).
+- The five Indian-species targets remain **NEEDS TRAINING**: as of October 2026
+  no licensed, obtainable, labelled dataset was found (DePondFi's files are not
+  served to anonymous users; the NR archive contains images without label
+  files), and the verification environment has **no CUDA GPU**. BlueEye states
+  this rather than fabricating weights.
 - CPU inference is comparatively slow for long videos (roughly 0.5–2 fps
   depending on hardware); GPU is recommended for longer footage.
 - Underwater enhancement is a heuristic preprocessing step and is **not**
@@ -599,7 +653,7 @@ blueeye/
 
 ## Future Scope
 
-Per the BlueEye report: training on larger and more diverse marine datasets
+Per the BlueEye report: training on larger and more diverse aquatic datasets
 to recognise rare/endangered species; real-time deployment on NVIDIA Jetson
 Nano / Raspberry Pi with underwater cameras; behaviour analysis, population
 tracking and migration patterns; cloud integration for large-scale storage
@@ -616,7 +670,7 @@ weights. No regional / Indian model is shipped or claimed before that happens.
 
 ## Credits & License
 
-- **BlueEye** — AI-powered marine life detection application, developed as
+- **BlueEye** — aquatic biodiversity detection application, developed as
   an academic project (Department of CSE, KIT, Tiptur, 2025-26).
 - **Pretrained models and reference implementation:** *marine-detect* by
   **Orange Business Services SA / Orange OpenSource**

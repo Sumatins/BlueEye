@@ -17,6 +17,9 @@
 # Source  : "Underwater Species Dataset (NR)" - 1,728 images, 7 classes
 #           (seals, dolphins, sea turtles, octopus, seahorse, sharks,
 #           whales). https://data.mendeley.com/datasets/4tp83br92z/1
+#           BLOCKER (Oct 2026): the published archive contains images only -
+#           NO YOLO label files - so it cannot be trained on until the
+#           annotations are published or the images are re-annotated.
 #           Also: Community Fish Detection dataset (1 class "fish"),
 #           https://lila.science/datasets/community-fish-detection-dataset
 # Licence : Underwater Species Dataset CC BY 4.0 (Mendeley).
