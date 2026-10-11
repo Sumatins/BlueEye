@@ -96,6 +96,7 @@ def render(detector: MarineDetector, settings) -> None:
         "'Ready' only after a real load and inference test - never from the file "
         "merely existing on disk."
     )
+    _coverage_section(registry, results)
     st.write("")
 
     visible = _apply_filters(registry, results, available)
@@ -118,6 +119,109 @@ def render(detector: MarineDetector, settings) -> None:
     _downloadable_section(detector, downloadable_specs, available, results)
     _unavailable_section(detector, unavailable_specs, available, results)
     _custom_explainer()
+
+
+# --------------------------------------------------------------------------- #
+# Capability coverage (honest "what can / cannot be detected")
+# --------------------------------------------------------------------------- #
+def _coverage_section(
+    registry: dict[str, ModelSpec], results: dict[str, dict]
+) -> None:
+    """Derived 'what these models can and cannot detect' panel.
+
+    Every claim is computed from the **real, verified class lists** of the
+    models that are installed and were load-tested in this session (installed
+    models report the classes read from their weights). The panel therefore
+    cannot drift from actual capabilities, and a group is only ever shown as
+    covered when a loaded model really has a matching class.
+    """
+    ready_classes = {
+        str(name).strip().lower()
+        for spec in registry
+        for name in (results.get(spec, {}).get("classes") or [])
+        if results.get(spec, {}).get("status") == "ready"
+    }
+
+    def covers(*tokens: str) -> bool:
+        return any(any(token in cls for token in tokens) for cls in ready_classes)
+
+    covered: list[str] = []
+    if covers("serranidae", "scaridae", "lutjanidae", "muraenidae", "lobster", "urchin", "sea_cucumber", "giant_clam", "fish"):
+        covered.append("Marine fish & invertebrates")
+    if covers("shark", "ray", "turtle"):
+        covered.append("Sharks, rays & sea turtles")
+    if covers("crab", "shrimp", "jellyfish", "starfish"):
+        covered.append("Crabs, jellyfish, shrimp & starfish")
+    if covers("chromis", "diplodus", "serranus", "mullus", "epinephelus", "dentex", "oblada", "sarpa"):
+        covered.append("Mediterranean reef species")
+    if covers("crocodile"):
+        covered.append("Crocodilians — class-level 'Crocodile' only")
+    if covers("frog"):
+        covered.append("Frogs — class-level 'Frog' only")
+
+    # Groups with no matching class anywhere in the installed models. Toads,
+    # salamanders, newts and alligators have no class in any candidate model
+    # either (checked against the Open Images v7 class list), so no model
+    # BlueEye can run will ever report them - that is said out loud.
+    absent = [
+        label
+        for label, token in (
+            ("Alligators", "alligator"),
+            ("Toads", "toad"),
+            ("Salamanders", "salamander"),
+            ("Newts", "newt"),
+            ("Amphibians (as a group)", "amphibian"),
+        )
+        if not any(token in cls for cls in ready_classes)
+    ]
+
+    st.markdown("### What these models can detect")
+    st.markdown(
+        "<p class='be-dash-lead'>Computed from the real class lists of the models "
+        "installed and verified in this session — this panel cannot drift from "
+        "actual capabilities.</p>",
+        unsafe_allow_html=True,
+    )
+    left, right = st.columns(2, gap="medium")
+    with left:
+        chips_html = " ".join(badge(name, "ok") for name in covered) or badge(
+            "No installed model", "off"
+        )
+        st.markdown(
+            "<div class='be-card'><div class='be-card-title'>Recognised groups"
+            f"</div><div style='margin-top:.4rem'>{chips_html}</div>"
+            "<p class='be-card-sub' style='margin-top:.5rem'>Classes identify a "
+            "broad animal group; they never establish a species identity.</p>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    with right:
+        if absent:
+            absent_html = " ".join(badge(name, "off") for name in absent)
+            st.markdown(
+                "<div class='be-card'><div class='be-card-title'>Not covered"
+                f"</div><div style='margin-top:.4rem'>{absent_html}</div>"
+                "<p class='be-card-sub' style='margin-top:.5rem'>Media containing "
+                "only these is honestly reported as “no organisms detected” — "
+                "BlueEye never guesses.</p></div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                "<div class='be-card'><div class='be-card-title'>Not covered"
+                "</div><p class='be-card-sub' style='margin-top:.4rem'>Every group "
+                "listed here has a matching class in an installed model.</p>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+    if absent and "wildlife_oi7" in registry:
+        wildlife_ready = results.get("wildlife_oi7", {}).get("status") == "ready"
+        if not wildlife_ready:
+            st.caption(
+                "An optional wildlife model (Open Images v7) can be downloaded on "
+                "this page. It adds class-level Crocodile and Frog detection, but "
+                "still has no alligator, toad, salamander or newt classes."
+            )
 
 
 # --------------------------------------------------------------------------- #
@@ -237,7 +341,7 @@ def _card(detector: MarineDetector, spec: ModelSpec, available: bool, result: di
         f"{badge(spec.key, 'info')}</div>"
     )
     if classes:
-        body += f"<div style='margin-bottom:.4rem'>{chips(classes)}</div>"
+        body += f"<div style='margin-bottom:.4rem'>{_class_chips(classes)}</div>"
     body += _metadata_block(
         [
             ("Architecture", spec.architecture),
@@ -288,6 +392,19 @@ def _card(detector: MarineDetector, spec: ModelSpec, available: bool, result: di
             _download_one(detector, spec)
     else:
         st.caption("Not runnable here - see the status and note above.")
+
+
+#: Maximum class chips drawn on a card before the rest are summarised.
+_MAX_CLASS_CHIPS = 24
+
+
+def _class_chips(classes: list[str]) -> str:
+    """Class chips, honestly summarised for checkpoints with hundreds of classes."""
+    shown = classes[:_MAX_CLASS_CHIPS]
+    markup = chips(shown)
+    if len(classes) > _MAX_CLASS_CHIPS:
+        markup += f" {badge(f'+{len(classes) - _MAX_CLASS_CHIPS} more classes', 'off')}"
+    return markup
 
 
 def _test_summary(status: str, error) -> str:

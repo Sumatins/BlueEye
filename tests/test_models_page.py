@@ -106,6 +106,55 @@ def test_required_buckets_and_fields_are_rendered() -> None:
         assert marker in _MODELS_SOURCE, f"missing Models-page field: {marker}"
 
 
+def test_models_page_states_what_cannot_be_detected() -> None:
+    """The page must say out loud what no installed model can detect."""
+    for marker in (
+        "What these models can detect",
+        "Recognised groups",
+        "Not covered",
+        "alligator, toad, salamander or newt",
+    ):
+        assert marker in _MODELS_SOURCE, f"missing coverage statement: {marker}"
+
+
+def test_models_page_summarises_very_large_class_lists() -> None:
+    """A 601-class checkpoint must not dump hundreds of chips onto one card."""
+    assert "_MAX_CLASS_CHIPS" in _MODELS_SOURCE
+    assert "more classes" in _MODELS_SOURCE
+
+
+def test_optional_wildlife_model_registry_entry_is_integrity_checked() -> None:
+    """The optional OI7 wildlife model is registered with a real, verifiable ID.
+
+    This reads the repository's own ``models/custom/registry.json`` (no network)
+    and asserts the entry stays honest: it must target the crocodile/frog
+    classes it actually has, must not claim alligator/toad/salamander/newt, and
+    must carry a valid download URL + SHA-256 so a downloaded file can be
+    verified rather than trusted.
+    """
+    registry_path = PROJECT_ROOT / "models" / "custom" / "registry.json"
+    import json
+
+    payload = json.loads(registry_path.read_text(encoding="utf-8"))
+    entries = {entry["id"]: entry for entry in payload["models"]}
+    assert "wildlife_oi7" in entries, "optional wildlife model entry is missing"
+    entry = entries["wildlife_oi7"]
+
+    classes = {str(name).lower() for name in entry["classes"]}
+    assert "crocodile" in classes
+    assert "frog" in classes
+    for unsupported in ("alligator", "toad", "salamander", "newt"):
+        assert unsupported not in classes, (
+            f"OI7 has no {unsupported} class - the registry must not claim one"
+        )
+
+    assert entry["download_url"].startswith("https://github.com/ultralytics/assets/")
+    assert len(entry["sha256"]) == 64
+    assert entry.get("auto") is False, "optional model must stay opt-in"
+    assert "alligator" in entry["limitations"].lower()
+
+
+
 def test_status_and_runtime_labels_cover_the_statuses() -> None:
     for status in ("ready", "not_installed", "needs_training", "incompatible"):
         assert status in STATUS_LABEL

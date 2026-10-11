@@ -166,6 +166,13 @@ def _model_step(detector: MarineDetector) -> None:
         width="stretch",
     )
     _model_info_card(detector, registry)
+    st.caption(
+        "Scope: BlueEye's models recognise marine and aquatic organisms (fish, "
+        "invertebrates, sharks, rays, sea turtles and a few additional groups). "
+        "They are not trained on crocodiles, amphibians (frogs, toads, "
+        "salamanders, newts) or most terrestrial animals — such media is honestly "
+        "reported as “no organisms detected” rather than guessed."
+    )
 
 
 def _model_info_card(detector: MarineDetector, registry: dict) -> None:

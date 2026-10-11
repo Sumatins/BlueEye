@@ -145,6 +145,30 @@
       "video_verified": true,
       "limitations": "Single generic 'Fish' class - identifies no species. Distributed as a zip; BlueEye verifies the extracted 'model.pt' by SHA-256.",
       "status_note": "Verified locally (loads + detects). Single generic 'Fish' class only."
+    },
+    {
+      "id": "wildlife_oi7",
+      "name": "Open Images v7 Wildlife (601 classes)",
+      "weights": "additional/wildlife_oi7/BlueEyeWildlifeOi7.pt",
+      "type": "yolov8",
+      "classes": ["Crocodile", "Frog", "Reptile", "Lizard", "Snake", "Sea turtle", "Turtle", "Animal", "Bird", "Fish", "Mammal", "Dolphin", "Whale", "Shark", "Seahorse", "Jellyfish", "Starfish", "Crab", "Shrimp", "Otter", "Hippopotamus"],
+      "recommended_confidence": 0.25,
+      "auto": false,
+      "category": "additional",
+      "habitat": "Aquatic & wildlife (any habitat)",
+      "architecture": "YOLOv8n (Ultralytics)",
+      "icon": "pets",
+      "version": "oiv7-yolov8n",
+      "source": "Ultralytics Open Images V7 pretrained checkpoint (dataset by Google / AI2)",
+      "license": "AGPL-3.0 (weights, same as the rest of BlueEye); Open Images V7 dataset CC BY 4.0",
+      "summary": "Optional 601-class general wildlife detector. Adds class-level Crocodile and Frog detection (the relevant subset is shown); the marine models remain the primary tools.",
+      "description": "601 Open Images v7 classes; the subset shown below is the one relevant to BlueEye (Crocodile, Frog, Sea turtle, ...)",
+      "homepage": "https://docs.ultralytics.com/datasets/detect/open-images-v7/",
+      "download_url": "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolov8n-oiv7.pt",
+      "sha256": "3851dfbf39ed2a076b1f39215cc22dba64eb5646f282bf964703785b0bed6a41",
+      "video_verified": false,
+      "limitations": "Class-level general object detection, not species identification: 'Crocodile' does not distinguish a mugger from a gharial, and 'Frog' covers all anurans. No alligator, toad, salamander or newt classes exist. Low mAP (18.4) - expect false positives on ambiguous images.",
+      "status_note": "Verified locally: 601 classes load from the checkpoint, and Crocodile (conf 0.94) was detected on a real mugger-crocodile photo."
     }
   ]
 }

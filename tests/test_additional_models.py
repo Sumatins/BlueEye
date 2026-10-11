@@ -248,6 +248,7 @@ EXPECTED_CUSTOM = {
     "obsea_mediterranean",
     "community_fish",
     "fishial_detector",
+    "wildlife_oi7",
 }
 
 

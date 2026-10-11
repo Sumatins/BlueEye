@@ -119,8 +119,10 @@ def _hero_band() -> None:
     uri = _image_data_uri(str(_HERO_IMAGE))
     st.markdown(
         '<div class="be-mhero" role="banner" '
-        "style=\"background-image: linear-gradient(100deg, "
-        "rgba(2, 9, 20, .92) 0%, rgba(2, 9, 20, .62) 42%, rgba(2, 9, 20, .15) 82%), "
+        "style=\"background-image: "
+        "linear-gradient(180deg, rgba(2, 9, 20, .10) 0%, rgba(2, 9, 20, .35) 58%, rgba(2, 9, 20, .80) 100%), "
+        "linear-gradient(100deg, "
+        "rgba(2, 9, 20, .94) 0%, rgba(2, 9, 20, .74) 48%, rgba(2, 9, 20, .28) 82%, rgba(2, 9, 20, .18) 100%), "
         f"url({uri});\">"
         '<div class="eyebrow">' + span("waves") + " BLUEEYE · MARINE INTELLIGENCE</div>"
         "<h1>See Beneath the Surface</h1>"

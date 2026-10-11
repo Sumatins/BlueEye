@@ -38,6 +38,43 @@ _DETECTION_KIND = {
 
 _SELECTED_KEY = "species_selected"
 
+#: Material icon used as the photo fallback tile, per animal group.
+_GROUP_ICONS: dict[str, str] = {
+    "Aquatic reptile": "pets",
+    "Coastal & marine fish": "set_meal",
+    "Freshwater fish": "set_meal",
+    "Freshwater shark": "set_meal",
+    "Freshwater turtle": "pets",
+    "Invertebrate": "bug_report",
+    "Reef fish": "set_meal",
+    "River dolphin & cetacean": "pets",
+    "Sea turtle": "pets",
+    "Shark & ray": "waves",
+}
+
+
+def _photo(species: Species, modifier: str = "") -> str:
+    """Species photograph with a graceful icon fallback.
+
+    The image lazy-loads and, if it ever fails (offline / moved file),
+    ``onerror`` flips the container to its fallback class so the browser's
+    broken-image placeholder is replaced by the group icon tile. A species
+    with no verified image simply shows the icon tile - never a fake photo.
+    """
+    icon = span(_GROUP_ICONS.get(species.group, "photo_camera"))
+    fallback = f'<div class="be-photo-fallback">{icon}</div>'
+    classes = f"be-photo {modifier}".strip()
+    if not species.image:
+        return f'<div class="{classes} be-photo--missing">{fallback}</div>'
+    return (
+        f'<div class="{classes}">'
+        f'<img src="{esc(species.image)}" alt="Photograph of {esc(species.common_name)}" '
+        'loading="lazy" referrerpolicy="no-referrer" '
+        f'title="Photo: {esc(species.image_credit or "Wikimedia Commons")}" '
+        "onerror=\"this.closest('.be-photo').classList.add('be-photo--missing')\">"
+        f"{fallback}</div>"
+    )
+
 
 def render(detector: MarineDetector, settings) -> None:
     """Render the explorer, or the detail view when a species is selected."""
@@ -129,6 +166,7 @@ def _filters_and_grid() -> None:
 def _card(species: Species) -> None:
     st.markdown(
         '<div class="be-card be-species-card">'
+        f"{_photo(species)}"
         f'<div class="be-card-title">{esc(species.common_name)}</div>'
         f"<p class='be-card-sub'><em>{esc(species.scientific_name)}</em></p>"
         f"<div style='margin:.2rem 0 .45rem'>{_detection_badge(species.detection)}</div>"
@@ -164,6 +202,10 @@ def _detail(species: Species) -> None:
         f"{_detection_badge(species.detection)}</div>",
         unsafe_allow_html=True,
     )
+
+    st.markdown(_photo(species, "be-photo--wide"), unsafe_allow_html=True)
+    if species.image and species.image_credit:
+        st.caption(f"Photo: {species.image_credit} (via Wikimedia Commons)")
 
     _heading("Overview")
     st.markdown(f"<p>{esc(species.overview)}</p>", unsafe_allow_html=True)
@@ -206,13 +248,6 @@ def _detail(species: Species) -> None:
         f"<p class='be-card-sub'>{esc(species.detection_note)}</p></div>",
         unsafe_allow_html=True,
     )
-
-    if species.image:
-        st.image(
-            species.image,
-            caption=species.image_credit or None,
-            width="stretch",
-        )
 
     _heading("References")
     _references(species.references)

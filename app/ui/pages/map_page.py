@@ -1,19 +1,25 @@
-"""Marine Areas Map: geographic marine-organism exploration.
+"""Marine Areas Map: worldwide geographic marine-organism exploration.
 
 The Map is a discovery surface, not a map of detection history. Users pick a
-coastline, sea, island or protected area (by search, dropdown or a click on
-the map itself) and are shown:
+place anywhere on Earth - by search, a curated quick-pick, exact coordinates
+or a click on the map itself - and are shown:
 
 * **Reported** - species from the BlueEye educational catalogue whose
   ``distribution`` text explicitly names the selected area (see
   :func:`app.content.regions.region_species`). Each card lists exactly which
-  location names matched, so nothing is invented.
+  location names matched, so nothing is invented. The catalogue is
+  India-first, so most worldwide areas honestly return an empty catalogue
+  list.
 * **Observed** - live georeferenced occurrence records for the area box,
   fetched (opt-in, online) from the Ocean Biodiversity Information System
   (OBIS). Records are shown as reported by third-party datasets, with source
   and licence attribution; OBIS data are predominantly CC0.
 * **Detected** - BlueEye media detections are never geotagged, so this page
   never attaches a detection to a location and says so explicitly.
+
+Worldwide places are geocoded online (OpenStreetMap Nominatim) or entered as
+exact coordinates; both become the same approximate exploration box the
+curated areas use, so search, OBIS and the map behave identically everywhere.
 
 Rendering is scoped to this page; nothing here touches inference, uploads,
 history or models.
@@ -31,10 +37,16 @@ import streamlit as st
 
 from app.content.regions import (
     REGIONS,
+    GeoPlace,
     MarineRegion,
+    bbox_windows,
     fetch_obis_observations,
+    geocode_area,
     get_region,
     obis_web_search_url,
+    parse_lat_lon,
+    region_from_coordinates,
+    region_from_place,
     region_species,
     regions_with_species,
     search_regions,
@@ -61,6 +73,11 @@ _GROUP_KEY = "map_group_filter"
 _OBS_KEY = "map_obis_toggle"
 _LAST_REGION_KEY = "map_last_region"
 _MAP_CHART_KEY = "map_chart"
+#: The active geocoded / coordinate area (a ``MarineRegion`` built at runtime).
+_PLACE_KEY = "map_place"
+_COORDS_KEY = "map_coords"
+_COORDS_GO_KEY = "map_coords_go"
+_COORDS_ERROR_KEY = "map_coords_error"
 
 #: deck.gl layer ids used for click selection.
 _AREA_LAYER_ID = "region-areas"
@@ -71,24 +88,34 @@ _OBS_LAYER_ID = "region-observations"
 # --------------------------------------------------------------------------- #
 # Main page
 # --------------------------------------------------------------------------- #
-def render(detector: MarineDetector, settings) -> None:
-    """Render the Marine Areas Map page."""
-    st.session_state.setdefault(_REGION_KEY, _DEFAULT_REGION)
+def _current_area() -> MarineRegion:
+    """The selected area: a geocoded/coordinate place, else a curated region."""
+    place = st.session_state.get(_PLACE_KEY)
+    if place is not None:
+        return place
     base = get_region(st.session_state.get(_REGION_KEY, _DEFAULT_REGION))
     if base is None:
         base = get_region(_DEFAULT_REGION)
     st.session_state[_REGION_KEY] = base.id
+    return base
+
+
+def render(detector: MarineDetector, settings) -> None:
+    """Render the Marine Areas Map page (worldwide)."""
+    st.session_state.setdefault(_REGION_KEY, _DEFAULT_REGION)
+    region = _current_area()
 
     hero(
         st,
         "Explorer · Geography",
         "Marine Areas Map",
-        "Pick a coastline, sea, island or protected area, then discover the "
-        "marine life reported for that stretch of ocean.",
+        "Pick or search any place on Earth - a coastline, sea, island, reef, "
+        "country or exact coordinates - then discover the marine life reported "
+        "for that stretch of ocean.",
         icon="map",
     )
 
-    region = _controls(base)
+    region = _controls(region)
 
     # Live observations are opt-in; the toggle lives in the side panel below,
     # so on a toggle change this fetch re-runs before the map is re-rendered.
@@ -108,36 +135,32 @@ def render(detector: MarineDetector, settings) -> None:
 # Location controls (search at the top, guaranteed selection below)
 # --------------------------------------------------------------------------- #
 def _controls(region: MarineRegion) -> MarineRegion:
-    """Search + pick controls; returns the effective (selected) region."""
+    """Search + pick controls; returns the effective (selected) area.
+
+    Works for curated areas and for geocoded/coordinate areas alike: the
+    curated dropdown is only shown while a curated area is active, and while
+    exploring a worldwide place the dropdown is replaced by a "back to curated
+    areas" button so the two selection modes can never fight each other.
+    """
     query = st.session_state.get(_SEARCH_KEY, "").strip()
     left, right = st.columns([3, 2], gap="medium")
 
     with left:
         st.text_input(
-            "Search a coastline, sea, island or protected area",
+            "Search any coastline, sea, island, reef or place on Earth",
             key=_SEARCH_KEY,
-            placeholder="e.g. Lakshadweep, Gulf of Kutch, Sundarbans…",
+            placeholder="e.g. Lakshadweep, Gulf of Kutch, Great Barrier Reef, Galápagos…",
         )
-        if query:
-            matches = search_regions(query)
-            if matches:
-                st.caption(
-                    f"{len(matches)} matching area{'s' if len(matches) != 1 else ''}:"
-                )
-                for col, match in zip(st.columns(min(len(matches), 4)), matches[:4]):
-                    with col:
-                        st.button(
-                            f"Select · {match.name}",
-                            key=f"map_sug_{match.id}",
-                            on_click=_select_region,
-                            args=(match.id,),
-                        )
-            else:
-                st.caption(
-                    f"No named marine area matches “{esc(query)}” in the BlueEye "
-                    "region catalogue — try a sea, island or coast name."
-                )
-                _suggestion_chips("Try")
+        _world_search_results(query)
+        _coordinate_explorer()
+
+    if st.session_state.get(_PLACE_KEY) is not None:
+        with right:
+            _place_banner(region)
+        if st.session_state.get(_LAST_REGION_KEY) != region.id:
+            st.session_state.pop(_GROUP_KEY, None)
+            st.session_state[_LAST_REGION_KEY] = region.id
+        return region
 
     index_by_id = {r.id: position for position, r in enumerate(REGIONS)}
     # Dynamic widget key: the dropdown re-mounts whenever the selected area
@@ -147,14 +170,18 @@ def _controls(region: MarineRegion) -> MarineRegion:
     select_key = f"{_SELECT_KEY}::{region.id}"
     with right:
         st.selectbox(
-            "or choose from all areas",
+            "or choose from the curated areas",
             options=[r.id for r in REGIONS],
             format_func=lambda rid: next(r.name for r in REGIONS if r.id == rid),
             key=select_key,
             index=index_by_id[region.id],
         )
         via_select = st.session_state.get(select_key)
-        if via_select and get_region(via_select) is not None:
+        if (
+            via_select
+            and via_select != region.id
+            and get_region(via_select) is not None
+        ):
             region = get_region(via_select)
             st.session_state[_REGION_KEY] = region.id
 
@@ -165,20 +192,113 @@ def _controls(region: MarineRegion) -> MarineRegion:
     return region
 
 
-def _select_region(region_id: str) -> None:
-    """Choose an area from a suggestion button.
+def _world_search_results(query: str) -> None:
+    """Curated matches first; otherwise offer a live worldwide geocode."""
+    if not query:
+        return
+    matches = search_regions(query)
+    if matches:
+        st.caption(f"{len(matches)} matching curated area{'s' if len(matches) != 1 else ''}:")
+        for col, match in zip(st.columns(min(len(matches), 4)), matches[:4]):
+            with col:
+                st.button(
+                    f"Select · {match.name}",
+                    key=f"map_sug_{match.id}",
+                    on_click=_select_region,
+                    args=(match.id,),
+                )
+        return
+    st.caption(
+        f"No curated area matches “{esc(query)}” - searching the whole world online…"
+    )
+    place = _geocode_cached(query)
+    if place is not None:
+        st.button(
+            f"Explore · {esc(place.display_name)}",
+            key="map_geo_explore_btn",
+            on_click=_select_place,
+            args=(place,),
+        )
+        st.caption(
+            f"Geocoded via {esc(place.source)} ({esc(place.precision)}). The box "
+            "is approximate - pan and zoom freely to explore the surroundings."
+        )
+    else:
+        st.caption(
+            "No geocoding result right now (live geocoding needs the internet and "
+            "must recognise the name). Try a curated area or the exact-coordinates "
+            "box below."
+        )
+        _suggestion_chips("Try", "search")
 
-    Only the page-level selection is written here; the "or choose from all
-    areas" dropdown re-mounts with the current region (dynamic widget key in
-    :func:`_controls`), so it always reflects the selected area no matter how
-    the selection was made (dropdown, search suggestion, or map click).
-    """
+
+def _coordinate_explorer() -> None:
+    """Worldwide fallback: explore exact coordinates, no geocoder needed."""
+    with st.expander("Or explore any coordinates on Earth (direct)", expanded=False):
+        coords_text = st.text_input(
+            "Latitude, longitude",
+            key=_COORDS_KEY,
+            placeholder="e.g. 23.8, 66.1  or  12.5S 45.2W",
+        )
+        if st.button("Explore this point", key=_COORDS_GO_KEY, type="primary"):
+            parsed = parse_lat_lon(coords_text)
+            if parsed is not None:
+                st.session_state[_PLACE_KEY] = region_from_coordinates(*parsed)
+                st.session_state.pop(_REGION_KEY, None)
+                st.session_state.pop(_COORDS_ERROR_KEY, None)
+            else:
+                st.session_state[_COORDS_ERROR_KEY] = True
+        if st.session_state.get(_COORDS_ERROR_KEY):
+            st.caption(
+                "That doesn't look like valid latitude, longitude. Use decimal "
+                "degrees such as `12.5, 77.2` (lat in [-90, 90], lon in [-180, 180])."
+            )
+
+
+def _place_banner(region: MarineRegion) -> None:
+    """Compact summary + "back to curated" escape while exploring a place."""
+    st.markdown(
+        '<div class="be-card be-map-area">'
+        f'<div class="be-card-title">{span("public")} Exploring a geocoded place</div>'
+        f"<h4>{esc(region.name)}</h4>"
+        f'<p class="note">{esc(region.note)}</p></div>',
+        unsafe_allow_html=True,
+    )
+    st.button("Back to curated areas", key="map_place_back", on_click=_clear_place)
+
+
+def _select_region(region_id: str) -> None:
+    """Choose a curated area from a suggestion button."""
     if get_region(region_id) is not None:
         st.session_state[_REGION_KEY] = region_id
+        st.session_state.pop(_PLACE_KEY, None)
 
 
-def _suggestion_chips(prefix: str) -> None:
-    """Quick-select buttons for areas that already have catalogue records."""
+def _select_place(place: GeoPlace) -> None:
+    """Start exploring a geocoded worldwide place."""
+    st.session_state[_PLACE_KEY] = region_from_place(place)
+    st.session_state.pop(_REGION_KEY, None)
+
+
+def _clear_place() -> None:
+    """Return from a geocoded/coordinate area to the curated quick-pick set."""
+    st.session_state.pop(_PLACE_KEY, None)
+    st.session_state[_REGION_KEY] = _DEFAULT_REGION
+
+
+@st.cache_data(show_spinner=False, ttl=3600 * 24)
+def _geocode_cached(query: str) -> GeoPlace | None:
+    """Cached worldwide geocoding; network failures and misses return ``None``."""
+    return geocode_area(query)
+
+
+def _suggestion_chips(prefix: str, namespace: str) -> None:
+    """Quick-select buttons for areas that already have catalogue records.
+
+    ``namespace`` distinguishes the call site in the widget key so every
+    ``map_chip_*`` key stays unique even when two call sites render the same
+    area with the same prefix.
+    """
     with_data = regions_with_species()
     if not with_data:
         return
@@ -187,7 +307,7 @@ def _suggestion_chips(prefix: str) -> None:
         with col:
             st.button(
                 f"{prefix} · {region.name}",
-                key=f"map_chip_{prefix.lower()}_{region.id}",
+                key=f"map_chip_{namespace}_{prefix.lower()}_{region.id}",
                 on_click=_select_region,
                 args=(region.id,),
             )
@@ -264,7 +384,7 @@ def _map(region: MarineRegion, obs: dict[str, Any] | None) -> None:
     view_state = pdk.ViewState(
         latitude=region.center[0],
         longitude=region.center[1],
-        zoom=4.8 if region.kind.startswith("Sea") else 6.2,
+        zoom=_view_zoom(region),
         controller=True,
     )
     deck = pdk.Deck(
@@ -288,17 +408,50 @@ def _map(region: MarineRegion, obs: dict[str, Any] | None) -> None:
     )
 
 
+def _view_zoom(region: MarineRegion) -> float:
+    """Zoom for the deck view: curated areas keep their tuned zoom levels.
+
+    Worldwide areas derive their zoom from the box span so a whole country
+    fits on screen while a small reef or point area stays close in.
+    """
+    if get_region(region.id) is not None:
+        return 4.8 if region.kind.startswith("Sea") else 6.2
+    lon_span = max(east - west for west, east in bbox_windows(region))
+    span_deg = max(region.max_lat - region.min_lat, lon_span)
+    if span_deg > 40:
+        return 3.4
+    if span_deg > 18:
+        return 4.2
+    if span_deg > 8:
+        return 5.0
+    if span_deg > 3:
+        return 5.8
+    return 6.4
+
+
+def _area_coords(region: MarineRegion) -> list[list[list[float]]]:
+    """Closed polygon ring(s) for a region's box.
+
+    Boxes crossing the international date line are drawn as two rings so the
+    polygon stays valid (right side of 180° and left side of -180°).
+    """
+    return [
+        [
+            [west, region.min_lat],
+            [east, region.min_lat],
+            [east, region.max_lat],
+            [west, region.max_lat],
+            [west, region.min_lat],
+        ]
+        for west, east in bbox_windows(region)
+    ]
+
+
 def _area_row(region: MarineRegion) -> dict[str, Any]:
     return {
         "id": region.id,
         "name": region.name,
-        "coords": [
-            [region.min_lon, region.min_lat],
-            [region.max_lon, region.min_lat],
-            [region.max_lon, region.max_lat],
-            [region.min_lon, region.max_lat],
-            [region.min_lon, region.min_lat],
-        ],
+        "coords": _area_coords(region),
     }
 
 
@@ -307,6 +460,7 @@ def _on_map_pick(event: Any = None) -> None:
     region_id = _picked_region_id(event)
     if region_id and region_id != st.session_state.get(_REGION_KEY):
         st.session_state[_REGION_KEY] = region_id
+        st.session_state.pop(_PLACE_KEY, None)
 
 
 def _picked_region_id(event: Any) -> str | None:
@@ -339,8 +493,8 @@ def _side_panel(region: MarineRegion, obs: dict[str, Any] | None) -> None:
         f"{_deg(region.center[0], 'N', 'S')} · {_deg(region.center[1], 'E', 'W')}"
     )
     area_text = (
-        f"{region.min_lat:.1f}–{region.max_lat:.1f}°N, "
-        f"{region.min_lon:.1f}–{region.max_lon:.1f}°E"
+        f"{_deg(region.min_lat, 'N', 'S')} – {_deg(region.max_lat, 'N', 'S')}, "
+        f"{_deg(region.min_lon, 'E', 'W')} – {_deg(region.max_lon, 'E', 'W')}"
     )
     st.markdown(
         '<div class="be-card be-map-area">'
@@ -396,7 +550,7 @@ def _catalogue_results(region: MarineRegion) -> None:
             f"{region.name}. Try a nearby area that already has records, or load "
             "live observations (OBIS) below for georeferenced records instead.",
         )
-        _suggestion_chips("Try")
+        _suggestion_chips("Try", "empty")
         return
 
     groups = sorted({species.group for species, _ in matches})
@@ -521,15 +675,17 @@ _SPECIES_ICONS = {
 # Live observations (OBIS)
 # --------------------------------------------------------------------------- #
 @st.cache_data(show_spinner=False, ttl=1800)
-def _obis_cached(region_id: str, size: int) -> dict[str, Any] | None:
-    """Cached OBIS lookup per region (network failures cache as ``None``)."""
-    region = get_region(region_id)
-    if region is None:
-        return None
+def _obis_cached(region: MarineRegion, size: int) -> dict[str, Any] | None:
+    """Cached OBIS lookup per area (network failures cache as ``None``).
+
+    The cached key is the whole (frozen, hashable) region so geocoded and
+    coordinate areas - which are not in :data:`REGIONS` - work exactly like
+    curated ones.
+    """
     try:
         return fetch_obis_observations(region, size=size)
     except Exception as exc:  # noqa: BLE001 - surfaced as a friendly notice
-        logger.info("OBIS lookup failed for %s: %s", region_id, exc)
+        logger.info("OBIS lookup failed for %s: %s", region.id, exc)
         return None
 
 
@@ -538,7 +694,7 @@ def _observations(region: MarineRegion) -> dict[str, Any] | None:
     if not st.session_state.get(_OBS_KEY, False):
         return None
     with st.spinner("Contacting the OBIS occurrence service…"):
-        return _obis_cached(region.id, _OBS_SAMPLE_SIZE)
+        return _obis_cached(region, _OBS_SAMPLE_SIZE)
 
 
 def _observations_panel(region: MarineRegion, obs: dict[str, Any] | None) -> None:

@@ -447,6 +447,33 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 .be-species-card .be-card-title { line-height: 1.3; }
 .be-species-card .be-chip { margin-top: .15rem; }
 
+/* Species photographs with a graceful icon fallback. A broken image URL
+   reveals the icon tile instead of the browser's broken-image glyph. */
+.be-photo {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--be-radius-sm);
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(11, 58, 102, .92), rgba(8, 32, 54, .96));
+  border: 1px solid var(--be-border);
+  margin-bottom: .55rem;
+}
+.be-photo img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.be-photo-fallback {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #7fdcf0;
+}
+.be-photo-fallback .be-ic { font-size: 2.1rem; }
+.be-photo--missing img { display: none; }
+.be-photo:not(.be-photo--missing) .be-photo-fallback { display: none; }
+.be-photo--wide { aspect-ratio: 21 / 9; margin-bottom: .35rem; }
+
 /* Scientific name shown under the main heading in a detail hero. */
 .be-hero .sci { color: #a9d6ec; font-size: 1.02rem; margin-top: .15rem; }
 
@@ -892,6 +919,8 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
   background: radial-gradient(circle at 30% 25%, rgba(34, 211, 238, .28), rgba(11, 58, 102, .55));
   border: 1px solid rgba(34, 211, 238, .3);
 }
+/* Let the text column shrink and wrap rather than overflow the card. */
+.be-bio-featured > div:not(.photo) { min-width: 0; }
 .be-bio-featured .photo .be-ic { font-size: 2.7rem; color: #a5ecfb; }
 .be-bio-featured h4 { margin: 0 0 .12rem 0; font-size: 1.14rem; color: var(--be-text); }
 .be-bio-featured .sci { color: #7dd3fc; font-size: .9rem; font-style: italic; margin: 0 0 .35rem 0; }
@@ -951,17 +980,22 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
   border: 1px solid rgba(34, 211, 238, .22);
 }
 .be-map-species .head .ic .be-ic { color: #7dd3fc; font-size: 1.4rem; }
-.be-map-species h4 { margin: 0; font-size: .98rem; color: var(--be-text); }
-.be-map-species .sci { color: var(--be-muted); font-size: .8rem; font-style: italic; margin: 0; }
+/* The text block must be allowed to shrink so long common/scientific names
+   wrap inside the card instead of overflowing next to the icon. */
+.be-map-species .head > div:not(.ic) { min-width: 0; flex: 1 1 auto; }
+.be-map-species h4 { margin: 0; font-size: .98rem; color: var(--be-text); overflow-wrap: anywhere; }
+.be-map-species .sci { color: var(--be-muted); font-size: .8rem; font-style: italic; margin: 0; overflow-wrap: anywhere; }
 .be-map-species .tags { display: flex; flex-wrap: wrap; gap: .35rem; }
 .be-map-species .about { color: var(--be-muted); font-size: .82rem; line-height: 1.5; margin: 0; }
 .be-map-species .foot {
   margin-top: auto; padding-top: .35rem;
-  display: flex; align-items: center; justify-content: space-between; gap: .4rem;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .4rem; flex-wrap: wrap;
 }
 .be-map-species .foot .loc {
   color: var(--be-muted); font-size: .76rem;
   display: inline-flex; align-items: center; gap: .25rem; min-width: 0;
+  overflow-wrap: anywhere;
 }
 .be-map-species .foot .loc .be-ic { color: #67e8f9; font-size: 1rem; }
 

@@ -205,3 +205,65 @@ def test_species_page_has_search_filters_detail_and_back() -> None:
         "References",
     ):
         assert marker in _PAGE_SOURCE, f"missing UI element: {marker}"
+
+
+# --------------------------------------------------------------------------- #
+# Species photographs (with a graceful icon fallback)
+# --------------------------------------------------------------------------- #
+def test_species_page_renders_photos_with_a_fallback() -> None:
+    from app.ui.pages.species import _photo
+
+    for species in SPECIES:
+        html = _photo(species)
+        assert "be-photo" in html
+        assert "be-photo-fallback" in html
+        if species.image:
+            assert "<img" in html
+            assert species.image in html
+            # A failed load must reveal the icon tile, not a broken image.
+            assert "onerror" in html
+            assert "be-photo--missing" in html
+        else:
+            assert "be-photo--missing" in html
+            assert "<img" not in html
+
+
+def test_photo_helper_escapes_untrusted_text() -> None:
+    from dataclasses import replace
+
+    from app.ui.pages.species import _photo
+
+    species = replace(
+        get_species("rohu"),
+        image="https://example.com/rohu.jpg",
+        image_credit='A & B <script>alert(1)</script>',
+    )
+    html = _photo(species, "be-photo--wide")
+    assert "be-photo--wide" in html
+    assert 'src="https://example.com/rohu.jpg"' in html
+    assert "<script>" not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_generated_species_images_are_well_formed_if_present() -> None:
+    try:
+        from app.content.species_images import SPECIES_IMAGES
+    except ImportError:  # the generated file is optional
+        return
+    known = {species.id for species in SPECIES}
+    for species_id, info in SPECIES_IMAGES.items():
+        assert species_id in known, f"image for unknown species: {species_id}"
+        assert info.get("url", "").startswith("https://"), species_id
+        assert info.get("credit", "").strip(), species_id
+        assert "license" in info, species_id
+
+
+def test_merged_species_images_match_the_data_file_if_present() -> None:
+    try:
+        from app.content.species_images import SPECIES_IMAGES
+    except ImportError:
+        return
+    for species_id, info in SPECIES_IMAGES.items():
+        species = get_species(species_id)
+        assert species.image == info["url"]
+        assert species.image_credit.strip()
