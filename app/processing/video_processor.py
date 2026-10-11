@@ -316,6 +316,8 @@ class VideoProcessor:
         progress_callback: ProgressCallback | None = None,
         save_json: bool = True,
         max_frames: int | None = None,
+        report_dir: str | Path | None = None,
+        output_dir: str | Path | None = None,
     ) -> VideoProcessResult:
         """Run the full video pipeline and return the stored artefacts.
 
@@ -345,7 +347,8 @@ class VideoProcessor:
             )
 
         if output_path is None:
-            out_path = unique_output_path(settings.videos_output_dir, "detection", ".mp4")
+            videos_dir = Path(output_dir) if output_dir else settings.videos_output_dir
+            out_path = unique_output_path(videos_dir, "detection", ".mp4")
         else:
             out_path = Path(output_path)
             ensure_dir(out_path.parent)
@@ -485,13 +488,14 @@ class VideoProcessor:
                 "statistics": stats,
                 "frame_detections": frame_detections,
             }
-            report_path = settings.reports_output_dir / f"{out_path.stem}.json"
+            reports_dir = Path(report_dir) if report_dir else settings.reports_output_dir
+            report_path = reports_dir / f"{out_path.stem}.json"
             try:
                 write_json(report_path, report)
                 result.report_path = report_path
             except OSError as exc:
                 raise ProcessingError(
-                    f"Could not save the JSON report to '{settings.reports_output_dir}': {exc}"
+                    f"Could not save the JSON report to '{reports_dir}': {exc}"
                 ) from exc
 
         logger.info(

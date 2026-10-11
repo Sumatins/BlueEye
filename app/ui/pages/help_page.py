@@ -39,7 +39,7 @@ _DOC_FILES: tuple[tuple[str, str, str], ...] = (
 )
 
 
-def render(detector: MarineDetector, settings) -> None:
+def render(detector: MarineDetector, settings, user=None) -> None:
     """Render the help and documentation content."""
     hero(
         st,

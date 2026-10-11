@@ -4,9 +4,11 @@ Every completed detection can be appended here, giving the web UI a real
 "History" and real "Analytics" page. Nothing is fabricated: entries are
 built from the JSON reports that the detection pipeline already writes.
 
-The store is a single JSON file (``outputs/history/detections.json`` by
-default) written atomically, newest entry first, and capped so it can never
-grow without bound.
+The store is one JSON file per scope (``outputs/history/detections.json``
+for CLI / unowned runs; ``outputs/history/users/<user_id>/detections.json``
+for web-UI runs), written atomically, newest entry first, and capped so it
+can never grow without bound. Entries carry a ``user_id`` so the records of
+different accounts never mix.
 
 SPDX-License-Identifier: AGPL-3.0-only
 """
@@ -50,6 +52,9 @@ class HistoryEntry:
     elapsed_seconds: float | None = None
     frames_processed: int | None = None
     detections_per_class: dict[str, int] = field(default_factory=dict)
+    #: Owning account id, when the run happened inside the web UI. CLI runs
+    #: leave this ``None`` (they are kept in the legacy, shared store).
+    user_id: str | None = None
 
     # ------------------------------------------------------------------ #
     # Construction
@@ -61,6 +66,7 @@ class HistoryEntry:
         report: dict[str, Any],
         output: str,
         report_path: str | None = None,
+        user_id: str | None = None,
     ) -> "HistoryEntry":
         """Build an entry from a pipeline JSON report payload.
 
@@ -92,6 +98,7 @@ class HistoryEntry:
             detections_per_class={
                 str(k): int(v) for k, v in (stats.get("detections_per_class") or {}).items()
             },
+            user_id=user_id,
         )
 
     # ------------------------------------------------------------------ #
@@ -114,6 +121,7 @@ class HistoryEntry:
             "elapsed_seconds": self.elapsed_seconds,
             "frames_processed": self.frames_processed,
             "detections_per_class": dict(self.detections_per_class),
+            "user_id": self.user_id,
         }
 
     @classmethod
@@ -138,6 +146,7 @@ class HistoryEntry:
             detections_per_class={
                 str(k): _as_int(v) for k, v in (payload.get("detections_per_class") or {}).items()
             },
+            user_id=str(payload["user_id"]) if payload.get("user_id") else None,
         )
 
     @property
@@ -152,9 +161,18 @@ class HistoryEntry:
 # --------------------------------------------------------------------------- #
 # Store operations
 # --------------------------------------------------------------------------- #
-def history_path(settings: Settings | None = None) -> Path:
-    """Location of the history file (inside the outputs directory)."""
+def history_path(settings: Settings | None = None, user_id: str | None = None) -> Path:
+    """Location of the history file (inside the outputs directory).
+
+    Web-UI runs are stored per account under
+    ``<outputs>/history/users/<user_id>/detections.json`` so that one
+    account can never read another account's records. When ``user_id`` is
+    ``None`` (CLI runs / legacy data) the shared
+    ``<outputs>/history/detections.json`` store is used.
+    """
     settings = settings or get_settings()
+    if user_id:
+        return settings.outputs_dir / "history" / "users" / user_id / "detections.json"
     return settings.outputs_dir / "history" / "detections.json"
 
 

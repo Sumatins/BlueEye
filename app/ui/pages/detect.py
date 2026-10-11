@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 MEDIA_MODES = ("Image", "Video")
 
 
-def render(detector: MarineDetector, settings) -> None:
+def render(detector: MarineDetector, settings, user=None) -> None:
     """Render the unified detection workflow (image + video)."""
     hero(
         st,
@@ -77,10 +77,11 @@ def render(detector: MarineDetector, settings) -> None:
         _render_no_weights(detector)
         return
 
+    user_id = user.id if user else None
     if media == "Image":
-        _image_workflow(detector, settings)
+        _image_workflow(detector, settings, user_id)
     else:
-        _video_workflow(detector, settings)
+        _video_workflow(detector, settings, user_id)
 
 
 # --------------------------------------------------------------------------- #
@@ -294,7 +295,7 @@ def _run_settings() -> dict:
 # --------------------------------------------------------------------------- #
 # Image workflow
 # --------------------------------------------------------------------------- #
-def _image_workflow(detector: MarineDetector, settings) -> None:
+def _image_workflow(detector: MarineDetector, settings, user_id: str | None = None) -> None:
     step(st, 1, "Upload an underwater image")
     uploaded = st.file_uploader(
         "Upload an underwater image",
@@ -321,7 +322,7 @@ def _image_workflow(detector: MarineDetector, settings) -> None:
         return
 
     try:
-        input_path = state.save_upload(uploaded, settings, "image")
+        input_path = state.save_upload(uploaded, settings, "image", user_id=user_id)
     except ValidationError as exc:
         error_card(
             st,
@@ -355,9 +356,9 @@ def _image_workflow(detector: MarineDetector, settings) -> None:
         width="stretch",
         key="run_image",
     ):
-        _run_image(detector, settings, input_path)
+        _run_image(detector, settings, input_path, user_id)
 
-    _render_image_results()
+    _render_image_results(settings, user_id)
 
 
 def _image_meta(input_path: Path) -> str:
@@ -380,14 +381,22 @@ def _image_meta(input_path: Path) -> str:
     )
 
 
-def _run_image(detector: MarineDetector, settings, input_path: Path) -> None:
-    """Run the image pipeline exactly as the original UI did."""
+def _run_image(
+    detector: MarineDetector, settings, input_path: Path, user_id: str | None = None
+) -> None:
+    """Run the image pipeline exactly as the original UI did.
+
+    Outputs and reports are written into the account's own directories when a
+    user is signed in, so different accounts never mix artefacts.
+    """
     try:
         with st.spinner("Analyzing image with YOLOv8..."):
             processor = ImageProcessor(detector, settings=settings)
             result = processor.process(
                 input_path=input_path,
                 **_run_settings(),
+                output_dir=state.user_dir(settings, user_id, "images") if user_id else None,
+                report_dir=state.user_dir(settings, user_id, "reports") if user_id else None,
                 save_json=True,
             )
     except (ValidationError, ModelError, ProcessingError, ValueError) as exc:
@@ -416,12 +425,16 @@ def _run_image(detector: MarineDetector, settings, input_path: Path) -> None:
     st.session_state["image_input"] = str(result.input_path)
 
     report = load_json(result.report_path) if result.report_path else None
-    state.record_history("image", report, result.output_path, result.report_path)
+    state.record_history("image", report, result.output_path, result.report_path, user_id=user_id)
 
 
-def _render_image_results() -> None:
+def _render_image_results(settings=None, user_id: str | None = None) -> None:
     output_path = st.session_state.get("image_result")
     if not output_path or not Path(output_path).exists():
+        return
+    # Ownership guard: never render/download files outside this account's
+    # scoped directories, even if session state was tampered with.
+    if not state.is_owned_path(settings, user_id, output_path):
         return
 
     report_path = st.session_state.get("image_report")
@@ -501,7 +514,7 @@ def _summary_metrics(stats: dict) -> None:
 # --------------------------------------------------------------------------- #
 # Video workflow
 # --------------------------------------------------------------------------- #
-def _video_workflow(detector: MarineDetector, settings) -> None:
+def _video_workflow(detector: MarineDetector, settings, user_id: str | None = None) -> None:
     step(st, 1, "Upload an underwater video")
     uploaded = st.file_uploader(
         "Upload an underwater video",
@@ -528,7 +541,7 @@ def _video_workflow(detector: MarineDetector, settings) -> None:
         return
 
     try:
-        input_path = state.save_upload(uploaded, settings, "video")
+        input_path = state.save_upload(uploaded, settings, "video", user_id=user_id)
         info = probe_video(input_path)
     except ValidationError as exc:
         error_card(
@@ -569,13 +582,23 @@ def _video_workflow(detector: MarineDetector, settings) -> None:
         width="stretch",
         key="run_video",
     ):
-        _run_video(detector, settings, input_path, info.frame_count or 0)
+        _run_video(detector, settings, input_path, info.frame_count or 0, user_id)
 
-    _render_video_results()
+    _render_video_results(settings, user_id)
 
 
-def _run_video(detector: MarineDetector, settings, input_path: Path, total_hint: int) -> None:
-    """Run the video pipeline with a real frame-by-frame progress bar."""
+def _run_video(
+    detector: MarineDetector,
+    settings,
+    input_path: Path,
+    total_hint: int,
+    user_id: str | None = None,
+) -> None:
+    """Run the video pipeline with a real frame-by-frame progress bar.
+
+    Outputs and reports are written into the account's own directories when a
+    user is signed in.
+    """
     progress = st.progress(0.0, text="Starting video processing...")
 
     def _on_progress(done: int, total: int | None) -> None:
@@ -594,6 +617,8 @@ def _run_video(detector: MarineDetector, settings, input_path: Path, total_hint:
                 input_path=input_path,
                 progress_callback=_on_progress,
                 save_json=True,
+                output_dir=state.user_dir(settings, user_id, "videos") if user_id else None,
+                report_dir=state.user_dir(settings, user_id, "reports") if user_id else None,
                 **_run_settings(),
             )
         progress.progress(1.0, text="Detection completed.")
@@ -626,12 +651,14 @@ def _run_video(detector: MarineDetector, settings, input_path: Path, total_hint:
     st.session_state["video_total_hint"] = total_hint
 
     report = load_json(result.report_path) if result.report_path else None
-    state.record_history("video", report, result.output_path, result.report_path)
+    state.record_history("video", report, result.output_path, result.report_path, user_id=user_id)
 
 
-def _render_video_results() -> None:
+def _render_video_results(settings=None, user_id: str | None = None) -> None:
     output_path = st.session_state.get("video_output")
     if not output_path or not Path(output_path).exists():
+        return
+    if not state.is_owned_path(settings, user_id, output_path):
         return
 
     report_path = st.session_state.get("video_report")

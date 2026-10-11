@@ -96,16 +96,17 @@ _MIME_BY_SUFFIX = {
 }
 
 
-def render(detector: MarineDetector, settings) -> None:
-    """Render the marine-intelligence dashboard."""
-    entries = load_entries(history_path(settings))
+def render(detector: MarineDetector, settings, user=None) -> None:
+    """Render the marine-intelligence dashboard for the signed-in account."""
+    user_id = user.id if user else None
+    entries = load_entries(history_path(settings, user_id=user_id))
     stats = summarize(entries)
     registry = state.registry(detector)
     available = state.available_keys(detector)
 
     _hero_band()
     _marine_stats(registry, stats, available)
-    _latest_detection(entries, registry)
+    _latest_detection(entries, registry, settings, user_id)
     _indian_biodiversity()
     _biodiversity_overview(entries)
     _recent_discoveries(entries, registry)
@@ -188,7 +189,7 @@ def _marine_stats(registry: dict, stats: dict, available: list[str]) -> None:
 # --------------------------------------------------------------------------- #
 # 3. Latest detection (original vs annotated vs details)
 # --------------------------------------------------------------------------- #
-def _latest_detection(entries: list, registry: dict) -> None:
+def _latest_detection(entries: list, registry: dict, settings=None, user_id=None) -> None:
     """Show the newest real result with full media comparison, or an empty state."""
     st.markdown("### Latest Detection")
     st.markdown(
@@ -196,8 +197,16 @@ def _latest_detection(entries: list, registry: dict) -> None:
         unsafe_allow_html=True,
     )
 
+    # Only runs whose artefacts belong to the signed-in account are shown.
     latest = next(
-        (e for e in entries if e.output and Path(e.output).is_file()), None
+        (
+            e
+            for e in entries
+            if e.output
+            and state.is_owned_path(settings, user_id, e.output)
+            and Path(e.output).is_file()
+        ),
+        None,
     )
     if latest is None:
         empty_state(
@@ -218,16 +227,16 @@ def _latest_detection(entries: list, registry: dict) -> None:
         return
 
     if latest.kind == "video" or Path(latest.output).suffix.lower() in VIDEO_SUFFIXES:
-        _latest_video(latest, registry)
+        _latest_video(latest, registry, settings, user_id)
     else:
-        _latest_image(latest, registry)
+        _latest_image(latest, registry, settings, user_id)
 
 
-def _latest_image(entry, registry: dict) -> None:
+def _latest_image(entry, registry: dict, settings=None, user_id=None) -> None:
     """Original image | arrow | annotated image, plus a details panel."""
     out = Path(entry.output)
     out_uri = _image_data_uri(str(out))
-    original = _resolve_input(entry)
+    original = _resolve_input(entry, settings, user_id)
 
     if original is not None and original.suffix.lower() in IMAGE_SUFFIXES:
         panel_a = (
@@ -262,10 +271,10 @@ def _latest_image(entry, registry: dict) -> None:
     )
 
 
-def _latest_video(entry, registry: dict) -> None:
+def _latest_video(entry, registry: dict, settings=None, user_id=None) -> None:
     """Annotated video (and original when its file is still on disk)."""
     out = Path(entry.output)
-    original = _resolve_input(entry)
+    original = _resolve_input(entry, settings, user_id)
 
     left, right = st.columns(2)
     with left:
@@ -595,21 +604,22 @@ def _discovery_row(entry, registry: dict) -> str:
 # --------------------------------------------------------------------------- #
 # Shared helpers
 # --------------------------------------------------------------------------- #
-def _resolve_input(entry) -> Path | None:
+def _resolve_input(entry, settings=None, user_id=None) -> Path | None:
     """Locate the original upload referenced by a history entry.
 
     Entries store the input *basename* (and occasionally a full path), while
-    uploads live in ``data/input`` and the bundled demo sample under
+    uploads live under the account's own ``data/input/<user_id>`` folder
+    (or ``data/input`` for CLI runs) and the bundled demo sample under
     ``assets/images/input_folder`` - all candidates are checked.
     """
     name = (entry.filename or "").strip()
     if not name or name == "unknown":
         return None
-    candidates = [
-        Path(name),
-        Path(PROJECT_ROOT / "data" / "input") / Path(name).name,
-        PROJECT_ROOT / "assets" / "images" / "input_folder" / Path(name).name,
-    ]
+    candidates = [Path(name)]
+    if settings is not None and user_id:
+        candidates.append(settings.input_dir / user_id / Path(name).name)
+    candidates.append(Path(PROJECT_ROOT / "data" / "input") / Path(name).name)
+    candidates.append(PROJECT_ROOT / "assets" / "images" / "input_folder" / Path(name).name)
     for candidate in candidates:
         if Path(candidate).is_file():
             return Path(candidate)

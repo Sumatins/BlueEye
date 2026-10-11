@@ -84,6 +84,11 @@ dashboard with statistics and a machine-readable JSON report.
 - **Analytics** — real charts computed from that history (top species,
   confidence distribution, models used) — never fabricated numbers
 - **Downloadable results** — annotated image/video + JSON from the UI
+- **Real accounts and protected pages** — local registration and login
+  (bcrypt-hashed passwords, server-side sessions), persistent sessions that
+  survive a browser refresh, real sign-out, and per-account privacy: your
+  history, uploads, outputs and reports are scoped to your account and never
+  shown to another user
 - **CPU by default, GPU automatically** when CUDA is available
 - **Modular architecture** — UI is a thin layer over the detection backend
 - **CLI + Web UI + Docker**
@@ -125,6 +130,7 @@ Code layers (dependency direction: UI → processing → detection → utils):
 | Package | Responsibility |
 | --- | --- |
 | `app/ui/` | Streamlit shell (navigation, theme) + page modules — no model/processing logic |
+| `app/auth/` | Local accounts: bcrypt hashing, SQLite store, server-side sessions, per-account scoping |
 | `app/main.py` | Command line interface |
 | `app/processing/` | Image pipeline, video pipeline, enhancement, drawing |
 | `app/detection/` | `MarineDetector` inference wrapper, model registry/download, structured results |
@@ -370,6 +376,60 @@ python -m app.main --help
 Exit codes: `0` success · `2` input/validation error · `3` model error ·
 `4` processing error · `1` unexpected error.
 
+## Authentication
+
+BlueEye is a Streamlit application with no separate API server, so the
+authentication *backend* is a small, self-contained module
+([`app/auth/`](app/auth/)) that the web UI calls directly. It is a real
+backend: accounts and sessions live in a SQLite database, passwords are
+hashed with **bcrypt**, and every protected operation is authorised against a
+server-verified session — nothing is trusted from the browser.
+
+- **Registration** — full name, email (normalised and validated) and a
+  password (minimum length plus at least one letter and one number). The
+  password is hashed with bcrypt before it is stored; plaintext never reaches
+  the database or the logs. Duplicate emails are rejected case-insensitively.
+- **Login** — credentials are verified against the stored hash. Failures show a
+  single generic message (and take constant-ish time) so the form never
+  reveals whether an email is registered.
+- **Sessions** — a successful login mints an opaque 256-bit random token. Only
+  its SHA-256 digest is stored, so a leaked database cannot be replayed. Tokens
+  expire after a server-side deadline (default 7 days) and can be revoked
+  immediately. The web UI re-validates the token against the database on every
+  run. Streamlit session state alone is lost on a full page reload, so the
+  token is also mirrored in a `SameSite=Lax` browser cookie (with `Secure` on
+  HTTPS); on load it is read back with `st.context.cookies` and validated
+  exactly like a session-state token, so a signed-in session survives a reload.
+  The cookie holds no user data and is deleted on sign-out — a revoked session
+  fails validation and the cookie is cleared automatically.
+- **Sign-out** — revokes the session in the database first, then clears the
+  local state. If server-side revocation genuinely fails, the UI says so
+  instead of claiming success.
+- **Protected routes** — Dashboard, AI Detection, Detection History, Analytics
+  and Account require a signed-in user. Species Explorer, Map, AI Models, About
+  and Help stay public (with a sign-in prompt).
+- **Per-account data** — detection history, uploads, annotated outputs and JSON
+  reports are stored under per-account directories
+  (`outputs/history/users/<user_id>/`, `data/input/<user_id>/`, …). The user id
+  is a server-generated value; ownership is checked before any file is shown or
+  downloaded, so one account can never read another's data. Existing
+  (pre-auth) history is preserved but is not shown in per-user views.
+
+### Configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `BLUEEYE_AUTH_DB` | `<outputs>/auth/blueeye_auth.db` | SQLite database holding accounts and sessions (git-ignored, covered by the outputs volume) |
+| `BLUEEYE_SESSION_TTL_DAYS` | `7` | Server-side session lifetime in days |
+| `BLUEEYE_PASSWORD_MIN_LENGTH` | `8` | Minimum password length enforced at registration / password change |
+
+The auth database contains only email addresses, display names, bcrypt hashes
+and session digests. Back it up with the rest of the `outputs/` volume. Email
+verification is **not** implemented (there is no SMTP server configured);
+accounts are active as soon as they are created. To deploy behind a shared
+host, run the app with Streamlit's built-in XSRF protection (the default) and
+serve it over HTTPS.
+
 ## Training / Fine-Tuning
 
 Training is optional — BlueEye works with the pretrained weights out of the
@@ -460,6 +520,9 @@ Settings come from environment variables or an optional `.env` file
 | `BLUEEYE_MAX_IMAGE_MB` | `25` | Upload limit |
 | `BLUEEYE_MAX_VIDEO_MB` | `400` | Upload limit |
 | `BLUEEYE_LOG_LEVEL` | `INFO` | Logging verbosity |
+| `BLUEEYE_AUTH_DB` | `<outputs>/auth/blueeye_auth.db` | Account / session database (see [Authentication](#authentication)) |
+| `BLUEEYE_SESSION_TTL_DAYS` | `7` | Session lifetime in days |
+| `BLUEEYE_PASSWORD_MIN_LENGTH` | `8` | Minimum password length |
 
 ### Model selection
 
@@ -564,6 +627,12 @@ pytest --cov=app       # with coverage
   validation, path containment, fail-safe behaviour), the dataset-preparation
   helper (`scripts/prepare_dataset.py`, including its refusal of unlabelled
   data) and the redesigned navigation / model-card metadata.
+- **Authentication tests** — the account backend against a real SQLite
+  database and real bcrypt (`tests/test_auth_service.py`), the Streamlit UI
+  driven end to end with `streamlit.testing.v1.AppTest`
+  (`tests/test_auth_ui.py`: register, login, refresh, logout, protected
+  routes, two-account isolation) and the per-account data scoping / ownership
+  guard (`tests/test_user_scoping.py`).
 - **Integration tests** — real weights on a real image and a real generated
   video; automatically **skipped** when weights are not downloaded and never
   require a GPU.
@@ -603,6 +672,10 @@ blueeye/
 │   │   ├── detector.py             # MarineDetector (inference API)
 │   │   ├── model_manager.py        # registry, download, cached loading, device
 │   │   └── results.py              # Detection, stats, JSON reports
+│   ├── auth/                       # local accounts: bcrypt, SQLite, sessions
+│   │   ├── security.py             # hashing, token generation, validation
+│   │   ├── store.py                # users + sessions SQLite persistence
+│   │   └── service.py              # register / login / logout / profile logic
 │   ├── processing/
 │   │   ├── image_processor.py      # image pipeline
 │   │   ├── video_processor.py      # frame-by-frame video pipeline
@@ -619,7 +692,7 @@ blueeye/
 │       ├── components.py            # reusable cards, badges, tables, notices
 │       ├── state.py                 # session state, upload intake, history
 │       └── pages/                   # Dashboard, Detect (Image/Video), Models,
-│                                    # Analytics, History, About
+│                                    # Analytics, History, Account, About
 ├── src/marine_detect/              # upstream reference code (AGPL-3.0, unmodified)
 ├── scripts/
 │   ├── download_models.py          # fetch official weights
@@ -640,10 +713,11 @@ blueeye/
 │   └── custom/                     # model extension point (registry.json)
 ├── data/                           # uploads + datasets (see data/README.md)
 ├── outputs/
-│   ├── images/                     # annotated images
-│   ├── videos/                     # annotated videos
-│   ├── reports/                    # JSON reports
-│   └── history/detections.json     # persisted detection history
+│   ├── images/                     # annotated images (per-account subdirs)
+│   ├── videos/                     # annotated videos (per-account subdirs)
+│   ├── reports/                    # JSON reports (per-account subdirs)
+│   ├── history/                    # persisted detection history (per account)
+│   └── auth/blueeye_auth.db        # accounts + sessions (git-ignored)
 ├── assets/                         # sample media from marine-detect
 ├── tests/                          # pytest suite (unit + integration)
 ├── requirements.txt
@@ -674,6 +748,16 @@ blueeye/
 - mAP/precision/recall metrics require a labelled dataset; none are bundled.
 - The web UI stores uploads on the local disk (`data/input/`) and is designed
   for **local/trusted use**, not for public internet exposure.
+- Authentication is a local, single-database implementation: there is **no
+  email verification** (accounts are active immediately), no password-reset
+  email flow and no third-party SSO. It is appropriate for a self-hosted or
+  demonstration deployment behind HTTPS; for multi-instance deployments, point
+  `BLUEEYE_AUTH_DB` at shared storage or replace the store with an external
+  identity provider.
+- The session cookie must be written from the page (a Streamlit app cannot set
+  response headers), so it is not `HttpOnly`. It contains only a random,
+  revocable token — no personal data — and is useless once the session is
+  revoked; still, serve the app over HTTPS and treat the browser as trusted.
 
 ## Future Scope
 

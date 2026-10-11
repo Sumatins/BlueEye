@@ -123,8 +123,38 @@ class Settings:
     max_image_mb: int = DEFAULT_MAX_IMAGE_MB
     max_video_mb: int = DEFAULT_MAX_VIDEO_MB
 
+    # Authentication (see app/auth). The database lives under ``outputs/``
+    # unless overridden, so it is never committed and survives container
+    # restarts when the outputs volume is mounted.
+    auth_db: Path | None = None
+    #: How long a session token stays valid (days, server-side expiry).
+    session_ttl_days: int = 7
+    #: Minimum password length enforced at registration / password change.
+    password_min_length: int = 8
+
     # Logging.
     log_level: str = "INFO"
+
+    # ------------------------------------------------------------------ #
+    # Authentication paths
+    # ------------------------------------------------------------------ #
+    @property
+    def auth_db_path(self) -> Path:
+        """Location of the SQLite authentication database.
+
+        Defaults to ``<outputs>/auth/blueeye_auth.db`` so that user accounts
+        and sessions live with the rest of the runtime data and are covered
+        by the same backup / volume mount as detection history.
+        """
+        if self.auth_db is None:
+            return self.outputs_dir / "auth" / "blueeye_auth.db"
+        path = self.auth_db
+        return path if path.is_absolute() else PROJECT_ROOT / path
+
+    @property
+    def session_ttl_seconds(self) -> int:
+        """Session lifetime in seconds (never below one day)."""
+        return max(1, self.session_ttl_days) * 86400
 
     # ------------------------------------------------------------------ #
     # Derived directories
@@ -221,6 +251,11 @@ def get_settings() -> Settings:
         enhancement_enabled=_env_str("ENHANCEMENT", "off").lower() in {"on", "true", "1", "yes"},
         max_image_mb=_env_int("MAX_IMAGE_MB", DEFAULT_MAX_IMAGE_MB),
         max_video_mb=_env_int("MAX_VIDEO_MB", DEFAULT_MAX_VIDEO_MB),
+        auth_db=_resolve_path(_env_str("AUTH_DB", ""), PROJECT_ROOT / "outputs" / "auth" / "blueeye_auth.db")
+        if _env_str("AUTH_DB", "")
+        else None,
+        session_ttl_days=_env_int("SESSION_TTL_DAYS", 7),
+        password_min_length=_env_int("PASSWORD_MIN_LENGTH", 8),
         log_level=_env_str("LOG_LEVEL", "INFO").upper(),
     )
     get_settings._cache = settings  # type: ignore[attr-defined]

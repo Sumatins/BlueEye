@@ -60,7 +60,7 @@ STATUS_LABEL = {
 RUNTIME_LABEL = {"yolo": "Ultralytics YOLO", "rtdetr": "Ultralytics RT-DETR"}
 
 
-def render(detector: MarineDetector, settings) -> None:
+def render(detector: MarineDetector, settings, user=None) -> None:
     """Render the model catalogue."""
     registry = state.registry(detector)
     available = set(state.available_keys(detector))

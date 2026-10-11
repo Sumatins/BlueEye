@@ -100,7 +100,7 @@ def _current_area() -> MarineRegion:
     return base
 
 
-def render(detector: MarineDetector, settings) -> None:
+def render(detector: MarineDetector, settings, user=None) -> None:
     """Render the Marine Areas Map page (worldwide)."""
     st.session_state.setdefault(_REGION_KEY, _DEFAULT_REGION)
     region = _current_area()

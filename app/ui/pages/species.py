@@ -76,7 +76,7 @@ def _photo(species: Species, modifier: str = "") -> str:
     )
 
 
-def render(detector: MarineDetector, settings) -> None:
+def render(detector: MarineDetector, settings, user=None) -> None:
     """Render the explorer, or the detail view when a species is selected."""
     selected_id = st.session_state.get(_SELECTED_KEY)
     if selected_id:

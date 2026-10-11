@@ -19,7 +19,7 @@ from app.ui.icons import span
 from app.ui.theme import esc
 
 
-def render(detector: MarineDetector, settings) -> None:
+def render(detector: MarineDetector, settings, user=None) -> None:
     """Render the BlueEye project description."""
     hero(
         st,

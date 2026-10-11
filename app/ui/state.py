@@ -25,7 +25,7 @@ from app.detection.detector import MarineDetector
 from app.detection.model_manager import ModelSpec
 from app.processing.enhancement import EnhancementConfig
 from app.utils.file_utils import unique_output_path
-from app.utils.history import HistoryEntry, add_entry
+from app.utils.history import HistoryEntry, add_entry, history_path
 from app.utils.validation import (
     ValidationError,
     ensure_extension,
@@ -108,8 +108,12 @@ def apply_pending_navigation() -> None:
 # --------------------------------------------------------------------------- #
 # Upload intake (identical validation to the CLI's input handling)
 # --------------------------------------------------------------------------- #
-def save_upload(uploaded: Any, settings: Any, kind: str) -> Path:
+def save_upload(uploaded: Any, settings: Any, kind: str, user_id: str | None = None) -> Path:
     """Validate a Streamlit upload and store it under ``data/input/``.
+
+    Web-UI uploads are scoped to the authenticated account
+    (``data/input/<user_id>/``); CLI uploads (``user_id=None``) keep using
+    ``data/input/`` directly.
 
     Raises :class:`ValidationError` with a user-facing message when the file
     is of an unsupported type, too large, empty or not decodable.
@@ -128,11 +132,16 @@ def save_upload(uploaded: Any, settings: Any, kind: str) -> Path:
     if not data:
         raise ValidationError("The uploaded file is empty.")
 
-    target = ensure_safe_path(settings.input_dir, settings.input_dir / name)
+    upload_dir = settings.input_dir
+    if user_id:
+        upload_dir = upload_dir / user_id
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    target = ensure_safe_path(upload_dir, upload_dir / name)
     if target.exists():
         target = ensure_safe_path(
-            settings.input_dir,
-            unique_output_path(settings.input_dir, Path(name).stem, Path(name).suffix).with_suffix(
+            upload_dir,
+            unique_output_path(upload_dir, Path(name).stem, Path(name).suffix).with_suffix(
                 Path(name).suffix
             ),
         )
@@ -207,8 +216,9 @@ def record_history(
     report: dict[str, Any] | None,
     output: Path | str | None,
     report_path: Path | str | None,
+    user_id: str | None = None,
 ) -> None:
-    """Append one finished detection to the persistent history.
+    """Append one finished detection to the authenticated user's history.
 
     History is a convenience feature: any failure here is logged and never
     interrupts the detection flow that triggered it.
@@ -221,7 +231,82 @@ def record_history(
             report,
             output=str(output or ""),
             report_path=str(report_path) if report_path else None,
+            user_id=user_id,
         )
-        add_entry(entry)
+        add_entry(entry, path=history_path(None, user_id=user_id))
     except Exception:  # noqa: BLE001 - history must never break detection
         logger.exception("Could not record detection history")
+
+
+# --------------------------------------------------------------------------- #
+# Per-user data scoping
+# --------------------------------------------------------------------------- #
+#: Areas with a per-account directory under their global store.
+_AREA_DIRS = ("input", "images", "videos", "reports")
+
+
+def user_dir(settings: Any, user_id: str, area: str) -> Path:
+    """Per-account directory for ``input`` / ``images`` / ``videos`` /
+    ``reports``. Paths built from a server-verified identity, never from
+    browser-supplied strings; the account id is a server-generated UUID hex.
+    """
+    if area not in _AREA_DIRS:
+        raise KeyError(f"unknown user data area: {area}")
+    base = {
+        "input": settings.input_dir,
+        "images": settings.images_output_dir,
+        "videos": settings.videos_output_dir,
+        "reports": settings.reports_output_dir,
+    }[area]
+    directory = base / user_id
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def is_owned_path(settings: Any, user_id: str, path: str | Path | None) -> bool:
+    """True only when ``path`` resolves inside one of the *current* account's
+    scoped directories. Used before offering downloads/results to make sure a
+    tampered history file cannot read another account's files."""
+    if not user_id or not path:
+        return False
+    try:
+        resolved = Path(path).resolve()
+    except (OSError, ValueError):
+        return False
+    roots = (
+        settings.input_dir / user_id,
+        settings.images_output_dir / user_id,
+        settings.videos_output_dir / user_id,
+        settings.reports_output_dir / user_id,
+        settings.outputs_dir / "history" / "users" / user_id,
+    )
+    for root in roots:
+        try:
+            if resolved.is_relative_to(root):
+                return True
+        except (OSError, ValueError):  # pragma: no cover - defensive
+            continue
+    return False
+
+
+#: Session-state keys that hold private media paths/statistics and must be
+#: dropped when the user signs out or signs in as a different account.
+PRIVATE_SESSION_KEYS = (
+    "image_result",
+    "image_report",
+    "image_input",
+    "video_output",
+    "video_report",
+    "video_stats",
+    "video_total_hint",
+)
+
+
+def clear_user_state() -> None:
+    """Drop private media session data and cached bytes (used on logout /
+    account switch) so a later user on the same browser session cannot see
+    a previous account's results."""
+    for key in PRIVATE_SESSION_KEYS:
+        st.session_state.pop(key, None)
+    # Media files are rendered from cached data URIs; drop those caches too.
+    st.cache_data.clear()

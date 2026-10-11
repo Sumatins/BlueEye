@@ -15,18 +15,20 @@ import streamlit as st
 
 from app.detection.detector import MarineDetector
 from app.detection.results import display_class_name
+from app.ui import state
 from app.ui.components import badge, download_button, empty_state, hero, metrics_row, notice
 from app.utils.history import clear_history, history_path, load_entries
 
 
-def render(detector: MarineDetector, settings) -> None:
-    """Render the detection history."""
-    store = history_path(settings)
+def render(detector: MarineDetector, settings, user=None) -> None:
+    """Render the detection history for the signed-in account."""
+    user_id = user.id if user else None
+    store = history_path(settings, user_id=user_id)
     entries = load_entries(store)
 
     hero(
         st,
-        "Stored on this machine",
+        "Saved locally under your account",
         "History",
         "Every finished detection, with its real inputs and outputs.",
         icon="history",
@@ -42,9 +44,9 @@ def render(detector: MarineDetector, settings) -> None:
         notice(
             st,
             "info",
-            "Session history",
-            f"History is persisted to {store} and survives restarts. "
-            "It is never sent anywhere.",
+            "Your history",
+            f"History is stored per account at {store} and survives "
+            "restarts. It is never sent anywhere.",
         )
         return
 
@@ -59,7 +61,7 @@ def render(detector: MarineDetector, settings) -> None:
     )
     st.write("")
 
-    _history_table(entries)
+    _history_table(entries, settings, user_id)
     st.write("")
     _actions(store)
 
@@ -67,7 +69,7 @@ def render(detector: MarineDetector, settings) -> None:
 # --------------------------------------------------------------------------- #
 # Sections
 # --------------------------------------------------------------------------- #
-def _history_table(entries) -> None:
+def _history_table(entries, settings=None, user_id=None) -> None:
     """Table of stored runs."""
     rows = []
     for index, entry in enumerate(entries, start=1):
@@ -93,11 +95,16 @@ def _history_table(entries) -> None:
     st.dataframe(rows, hide_index=True, width="stretch")
 
     with st.expander("Show the newest run in detail", expanded=False):
-        _entry_detail(entries[0])
+        _entry_detail(entries[0], settings, user_id)
 
 
-def _entry_detail(entry) -> None:
-    """Detail block for one entry (class breakdown + report download)."""
+def _entry_detail(entry, settings=None, user_id=None) -> None:
+    """Detail block for one entry (class breakdown + report download).
+
+    Downloads are only offered for files that belong to the signed-in
+    account's own scoped directories; anything else is reported as available
+    (never exposed) without revealing where it actually lives.
+    """
     st.markdown(f"**{Path(entry.filename).name}** · {entry.display_time}")
     body = (
         "<dl class='be-kv'>"
@@ -123,12 +130,18 @@ def _entry_detail(entry) -> None:
             unsafe_allow_html=True,
         )
 
-    if entry.report and Path(entry.report).exists():
+    report_owned = bool(entry.report) and state.is_owned_path(settings, user_id, entry.report)
+    output_owned = bool(entry.output) and state.is_owned_path(settings, user_id, entry.output)
+    if report_owned and Path(entry.report).exists():
         download_button(st, "Download JSON report", entry.report, "application/json")
-    if entry.output and Path(entry.output).exists():
+    elif entry.report:
+        st.caption("JSON report is not available for download.")
+    if output_owned and Path(entry.output).exists():
         suffix = Path(entry.output).suffix.lower()
         mime = "video/mp4" if suffix in {".mp4", ".mov", ".mkv", ".avi"} else "image/jpeg"
         download_button(st, "Download output file", entry.output, mime)
+    elif entry.output:
+        st.caption("Output file is not available for download.")
 
 
 def _actions(store: Path) -> None:

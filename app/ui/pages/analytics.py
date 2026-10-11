@@ -23,9 +23,10 @@ from app.utils.history import (
 )
 
 
-def render(detector: MarineDetector, settings) -> None:
-    """Render session/cumulative analytics."""
-    entries = load_entries(history_path(settings))
+def render(detector: MarineDetector, settings, user=None) -> None:
+    """Render session/cumulative analytics for the signed-in account."""
+    user_id = user.id if user else None
+    entries = load_entries(history_path(settings, user_id=user_id))
     stats = summarize(entries)
 
     hero(
@@ -49,8 +50,8 @@ def render(detector: MarineDetector, settings) -> None:
             "info",
             "Where the data comes from",
             "Each completed detection appends an entry to "
-            f"{history_path(settings).name} in the outputs folder. Nothing is "
-            "uploaded anywhere.",
+            f"{history_path(settings, user_id=user_id).name} in the outputs "
+            "folder. Nothing is uploaded anywhere.",
         )
         return
 
@@ -113,7 +114,8 @@ def render(detector: MarineDetector, settings) -> None:
         "info",
         "Stored locally",
         f"{stats['runs']} detection(s) are kept in "
-        f"{history_path(settings)}. You can clear them on the History page.",
+        f"{history_path(settings, user_id=user_id)}. You can clear them on "
+        "the History page.",
     )
 
 

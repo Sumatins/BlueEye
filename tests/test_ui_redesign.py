@@ -221,3 +221,59 @@ def test_registry_metrics_are_parsed(tmp_path) -> None:
     spec = load_custom_specs(models_dir)["regional_demo"]
     assert ("mAP@50", "0.81") in spec.metrics
     assert ("precision", "0.79") in spec.metrics
+
+
+# --------------------------------------------------------------------------- #
+# Authentication / account page structure
+# --------------------------------------------------------------------------- #
+def test_account_page_is_in_the_navigation() -> None:
+    page_ids = [page_id for page_id, _, _ in theme.PAGES]
+    labels = [label for _, label, _ in theme.PAGES]
+    assert "account" in page_ids
+    assert "Account" in labels
+    grouped = {title: ids for title, ids in theme.NAV_GROUPS}
+    assert grouped["Account"] == ("account",)
+
+
+def test_every_page_render_accepts_a_user_argument() -> None:
+    """Private pages must receive the authenticated user from the shell."""
+    import inspect
+
+    pages_dir = PROJECT_ROOT / "app" / "ui" / "pages"
+    for page_id, _, _ in theme.PAGES:
+        module = PAGE_MODULES[page_id]
+        signature = inspect.signature(module.render)
+        assert "user" in signature.parameters, f"{module.__name__}.render lacks 'user'"
+
+
+def test_private_pages_are_gated_and_public_pages_are_open() -> None:
+    from app.ui import auth_ui
+
+    assert auth_ui.PRIVATE_PAGES == {
+        "dashboard",
+        "detect",
+        "history",
+        "analytics",
+        "account",
+    }
+    # Species / map / models / about / help must remain browsable anonymously.
+    public = {"species", "map", "models", "about", "help"}
+    assert public.isdisjoint(auth_ui.PRIVATE_PAGES)
+
+
+def test_auth_ui_uses_the_real_backend() -> None:
+    source = (PROJECT_ROOT / "app" / "ui" / "auth_ui.py").read_text(encoding="utf-8")
+    # The UI authenticates exclusively through the real service.
+    assert "AuthService" in source
+    assert ".authenticate(" in source
+    assert ".login(" in source
+    assert ".register(" in source
+    assert ".logout(" in source
+    # Sessions are an opaque server-side token, never a client-supplied identity.
+    assert "be_auth_token" in source
+    # Logout clears private UI state instead of leaking the previous account.
+    assert "clear_user_state" in source
+    # No fake/demo credentials may be baked into the UI.
+    for fabricated in ("demo_password", "admin123", "password123", "test_account"):
+        assert fabricated not in source
+

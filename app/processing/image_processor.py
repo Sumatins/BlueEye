@@ -72,6 +72,7 @@ class ImageProcessor:
         output_dir: str | Path | None = None,
         save_json: bool = True,
         annotate: bool = True,
+        report_dir: str | Path | None = None,
     ) -> ImageProcessResult:
         """Run the full image pipeline and return the stored artefacts.
 
@@ -134,12 +135,13 @@ class ImageProcessor:
             report = detection.to_report()
             report["output_image"] = output_path.name
             report["processing_time_seconds"] = round(time.perf_counter() - started, 3)
-            report_path = settings.reports_output_dir / f"{output_path.stem}.json"
+            reports_dir = Path(report_dir) if report_dir else settings.reports_output_dir
+            report_path = reports_dir / f"{output_path.stem}.json"
             try:
                 write_json(report_path, report)
             except OSError as exc:
                 raise ProcessingError(
-                    f"Could not save the JSON report to '{settings.reports_output_dir}': {exc}"
+                    f"Could not save the JSON report to '{reports_dir}': {exc}"
                 ) from exc
 
         elapsed = time.perf_counter() - started

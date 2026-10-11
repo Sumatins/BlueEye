@@ -39,6 +39,7 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("analytics", "Analytics", "bar_chart"),
     ("about", "About BlueEye", "info"),
     ("help", "Help & Documentation", "help"),
+    ("account", "Account", "account_circle"),
 )
 
 #: Sidebar section grouping: (section title, page ids in display order).
@@ -47,6 +48,7 @@ NAV_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Main", ("dashboard", "detect")),
     ("Explore", ("history", "species", "map", "models", "analytics")),
     ("Information", ("about", "help")),
+    ("Account", ("account",)),
 )
 
 #: Legacy page ids that resolve to the unified Detect workflow, mapped to the
@@ -1012,6 +1014,36 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 /* OBIS source / attribution note. */
 .be-obs-src { margin-top: .35rem; }
 .be-obs-src p { color: var(--be-muted); font-size: .76rem; line-height: 1.5; margin: .3rem 0 0; }
+
+/* ------------------------------------------------------------------ */
+/* Authentication gate + account page                                  */
+/* ------------------------------------------------------------------ */
+.be-auth { text-align: center; margin: 2.2rem 0 .6rem; }
+.be-auth .be-auth-mark {
+  width: 64px; height: 64px; margin: 0 auto .65rem;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 18px; background: linear-gradient(135deg, #0b3a66, #0891b2);
+  border: 1px solid rgba(34, 211, 238, .35);
+  box-shadow: var(--be-shadow);
+}
+.be-auth .be-auth-mark .be-ic { color: #cffafe; font-size: 2.2rem; }
+.be-auth h1 { margin: 0; font-size: 1.9rem; letter-spacing: -.02em; color: var(--be-text); }
+.be-auth .be-auth-sub { color: var(--be-muted); margin: .3rem 0 0; font-size: .95rem; }
+.be-auth-title {
+  display: flex; align-items: center; gap: .55rem;
+  font-weight: 650; font-size: 1.05rem; color: var(--be-text); margin-bottom: .4rem;
+}
+.be-auth-title .be-ic { color: #67e8f9; font-size: 1.25rem; }
+.be-value { font-size: 1.05rem; color: var(--be-text); margin: .15rem 0 0; }
+.be-side-acct {
+  margin: 1rem 0 .2rem; padding: .7rem .8rem;
+  background: var(--be-surface); border: 1px solid var(--be-border);
+  border-radius: var(--be-radius-sm);
+}
+.be-side-acct-head { display: flex; align-items: center; gap: .6rem; }
+.be-side-acct-head .be-ic { color: #67e8f9; font-size: 1.6rem; }
+.be-side-acct-head .n { margin: 0; color: var(--be-text); font-weight: 600; font-size: .9rem; overflow-wrap: anywhere; }
+.be-side-acct-head .e { margin: 0; color: var(--be-muted); font-size: .76rem; overflow-wrap: anywhere; }
 
 /* ------------------------------------------------------------------ */
 /* Responsive                                                           */
