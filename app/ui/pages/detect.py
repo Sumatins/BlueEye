@@ -55,12 +55,13 @@ MEDIA_MODES = ("Image", "Video")
 
 
 def render(detector: MarineDetector, settings) -> None:
-    """Render the detection workflow."""
+    """Render the unified detection workflow (image + video)."""
     hero(
         st,
-        "Detection",
-        "Aquatic Detection",
-        "Identify aquatic animals in underwater images and supported videos.",
+        "One workspace",
+        "AI Detection",
+        "Detect aquatic life in underwater images and supported videos. "
+        "Choose a media type, pick a model and run the same pipeline.",
         icon="center_focus_strong",
     )
 

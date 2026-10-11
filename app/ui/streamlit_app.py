@@ -33,6 +33,7 @@ from app.ui.pages import (  # noqa: E402
     detect,
     help_page,
     history_page,
+    map_page,
     models,
     species,
 )
@@ -42,12 +43,15 @@ from app.ui.theme import DETECT_PAGES, PAGES, apply_theme  # noqa: E402
 logger = logging.getLogger(__name__)
 
 #: Page id -> module exposing ``render(detector, settings)``.
-#: ``detect_image`` / ``detect_video`` share the Detect workflow module.
+#: The legacy ``detect_image`` / ``detect_video`` ids are kept here so any
+#: stale reference still resolves to the same unified Detect workflow.
 PAGE_MODULES = {
     "dashboard": dashboard,
+    "detect": detect,
     "detect_image": detect,
     "detect_video": detect,
     "species": species,
+    "map": map_page,
     "models": models,
     "analytics": analytics,
     "history": history_page,
@@ -85,6 +89,27 @@ def _sidebar() -> str:
         )
 
         state.apply_pending_navigation()
+
+        # Legacy "Detect an Image" / "Analyse a Video" ids now resolve to the
+        # one unified AI Detection page with the matching media preselected.
+        legacy_media = DETECT_PAGES.get(st.session_state.get("nav_sel"))
+        if legacy_media:
+            st.session_state["detect_media"] = legacy_media
+            st.session_state["nav_sel"] = "detect"
+
+        # HTML deep links (?page=... [&species=...]) used by dashboard CTAs.
+        requested = st.query_params.get("page")
+        if isinstance(requested, str) and requested:
+            if requested in DETECT_PAGES:  # old ?page=detect_image / detect_video
+                st.session_state["detect_media"] = DETECT_PAGES[requested]
+                requested = "detect"
+            if requested in {page_id for page_id, _, _ in PAGES}:
+                st.session_state["nav_sel"] = requested
+                species_id = st.query_params.get("species")
+                if requested == "species" and isinstance(species_id, str) and species_id:
+                    st.session_state["species_selected"] = species_id
+                st.query_params.clear()
+
         page = st.radio(
             "Navigation",
             options=[page_id for page_id, _, _ in PAGES],
@@ -116,12 +141,6 @@ def main() -> None:
     state.init_session(settings)
 
     page = _sidebar()
-
-    # "Detect an Image" / "Analyse a Video" are two entry points into the one
-    # Detect workflow; preselect the media type before the page renders.
-    media = DETECT_PAGES.get(page)
-    if media:
-        st.session_state["detect_media"] = media
 
     module = PAGE_MODULES.get(page, dashboard)
     module.render(detector, settings)

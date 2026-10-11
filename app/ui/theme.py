@@ -1,10 +1,10 @@
-"""BlueEye visual design system (ocean theme).
+"""BlueEye visual design system (marine theme).
 
 All styling lives here so that page code stays free of CSS and the look
 remains consistent across every page (single source of truth for colours,
-radii, shadows and spacing). The palette is deliberately restrained:
-deep-ocean navy, cyan/teal accents and light surfaces - appropriate for a
-scientific tool rather than a flashy demo.
+radii, shadows and spacing). The palette is a deliberate deep-ocean marine
+intelligence look: near-black navy page, ocean-blue panels, cyan/teal
+accents and light text - premium for a demo, legible for a scientific tool.
 
 The icon language is Material Symbols Rounded (see :mod:`app.ui.icons`);
 navigation icons and section headers are generated from :data:`PAGES` and
@@ -23,16 +23,18 @@ import streamlit as st
 
 #: Ordered navigation entries: (page id, label, Material icon name).
 #:
-#: ``detect_image`` and ``detect_video`` both open the same Detect workflow
-#: with the matching media type preselected, so the sidebar can offer direct
-#: "Detect an Image" / "Analyse a Video" entry points without duplicating
-#: code.
+#: There is exactly **one** detection entry point: the unified ``detect``
+#: page (labelled "AI Detection") handles both image and video analysis
+#: through its own media selector. The old ``detect_image`` /
+#: ``detect_video`` ids are kept in :data:`DETECT_PAGES` purely as a legacy
+#: redirect: if anything still asks for them, the shell opens ``detect`` with
+#: the matching media type preselected.
 PAGES: tuple[tuple[str, str, str], ...] = (
     ("dashboard", "Dashboard", "home"),
-    ("detect_image", "Detect an Image", "image"),
-    ("detect_video", "Analyse a Video", "videocam"),
+    ("detect", "AI Detection", "center_focus_strong"),
     ("history", "Detection History", "history"),
     ("species", "Species Explorer", "menu_book"),
+    ("map", "Map", "map"),
     ("models", "AI Models", "psychology"),
     ("analytics", "Analytics", "bar_chart"),
     ("about", "About BlueEye", "info"),
@@ -42,13 +44,14 @@ PAGES: tuple[tuple[str, str, str], ...] = (
 #: Sidebar section grouping: (section title, page ids in display order).
 #: The ids must match :data:`PAGES`; section headers are rendered by CSS.
 NAV_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Main", ("dashboard", "detect_image", "detect_video")),
-    ("Explore", ("history", "species", "models", "analytics")),
+    ("Main", ("dashboard", "detect")),
+    ("Explore", ("history", "species", "map", "models", "analytics")),
     ("Information", ("about", "help")),
 )
 
-#: Page ids that render the shared Detect workflow and the media type each
-#: one preselects. Consumed by the application shell.
+#: Legacy page ids that resolve to the unified Detect workflow, mapped to the
+#: media type they preselect. Consumed by the application shell when a stale
+#: ``nav_sel`` or ``?page=`` deep link still names one of them.
 DETECT_PAGES: dict[str, str] = {"detect_image": "Image", "detect_video": "Video"}
 
 #: Widget label of the Detect page media selector (CSS hooks the segmented
@@ -89,28 +92,28 @@ CSS = """
 /* Design tokens                                                        */
 /* ------------------------------------------------------------------ */
 :root {
-  --be-deep:      #041428;
-  --be-navy:      #07203c;
+  --be-deep:      #030b18;
+  --be-navy:      #061a30;
   --be-blue:      #0b3a66;
   --be-cyan:      #0891b2;
   --be-cyan-lit:  #22d3ee;
   --be-teal:      #0d9488;
-  --be-surface:   #ffffff;
-  --be-surface-2: #f2f8fc;
-  --be-border:    #dbe7f0;
-  --be-text:      #0f2437;
-  --be-muted:     #55697d;
-  --be-ok:        #0f7b5f;
-  --be-ok-bg:     #e3f7f0;
-  --be-warn:      #8a5a00;
-  --be-warn-bg:   #fdf3dd;
-  --be-off:       #6b7b8c;
-  --be-off-bg:    #eef3f7;
-  --be-danger:    #a3243b;
-  --be-danger-bg: #fdeaed;
+  --be-surface:   #0b223d;
+  --be-surface-2: #0f2c4e;
+  --be-border:    rgba(125, 195, 235, .16);
+  --be-text:      #e9f4fb;
+  --be-muted:     #8fb0c9;
+  --be-ok:        #5eead4;
+  --be-ok-bg:     rgba(20, 184, 166, .16);
+  --be-warn:      #fcd34d;
+  --be-warn-bg:   rgba(245, 158, 11, .15);
+  --be-off:       #c3d4e2;
+  --be-off-bg:    rgba(148, 163, 184, .15);
+  --be-danger:    #fda4af;
+  --be-danger-bg: rgba(225, 29, 72, .16);
   --be-radius:    14px;
   --be-radius-sm: 9px;
-  --be-shadow:    0 1px 2px rgba(7, 32, 60, .05), 0 10px 26px rgba(7, 32, 60, .07);
+  --be-shadow:    0 1px 2px rgba(0, 0, 0, .3), 0 12px 28px rgba(0, 0, 0, .35);
 }
 
 /* ------------------------------------------------------------------ */
@@ -147,7 +150,7 @@ html, body, [class*="css"], .stApp {
   color: var(--be-cyan);
 }
 .be-ic--lg  { font-size: 1.4rem; }
-.be-ic--xl  { font-size: 2.1rem; color: #0e7ba8; }
+.be-ic--xl  { font-size: 2.1rem; color: #7dd3fc; }
 
 /* ------------------------------------------------------------------ */
 /* Cards                                                                */
@@ -177,10 +180,10 @@ html, body, [class*="css"], .stApp {
 .be-iblock .tile {
   flex: none; width: 38px; height: 38px; border-radius: 11px;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #e2f4fb, #d5edf9);
-  border: 1px solid #c4e4f3;
+  background: linear-gradient(135deg, rgba(34, 211, 238, .16), rgba(34, 211, 238, .05));
+  border: 1px solid rgba(34, 211, 238, .22);
 }
-.be-iblock .tile .be-ic { color: #0e7ba8; font-size: 1.3rem; }
+.be-iblock .tile .be-ic { color: #7dd3fc; font-size: 1.3rem; }
 .be-iblock .body { min-width: 0; flex: 1; }
 .be-iblock .body .t {
   display: flex; align-items: center; flex-wrap: wrap; gap: .5rem;
@@ -238,7 +241,7 @@ html, body, [class*="css"], .stApp {
 .be-badge--ok   { background: var(--be-ok-bg);   color: var(--be-ok); }
 .be-badge--warn { background: var(--be-warn-bg); color: var(--be-warn); }
 .be-badge--off  { background: var(--be-off-bg);  color: var(--be-off); }
-.be-badge--info { background: #e2f4fb;           color: #075985; }
+.be-badge--info { background: rgba(34, 211, 238, .14); color: #7dd3fc; }
 .be-badge .be-dot {
   display: inline-block; width: .5em; height: .5em; border-radius: 50%;
   background: currentColor; margin-right: .42rem; vertical-align: .06em;
@@ -253,9 +256,9 @@ html, body, [class*="css"], .stApp {
 
 .be-chip {
   display: inline-block;
-  background: var(--be-surface-2);
+  background: rgba(255, 255, 255, .05);
   border: 1px solid var(--be-border);
-  color: var(--be-blue);
+  color: #a5d8ea;
   border-radius: 999px;
   padding: .1rem .55rem;
   margin: 0 .25rem .3rem 0;
@@ -274,9 +277,9 @@ html, body, [class*="css"], .stApp {
 .be-notice h3 { margin: 0 0 .3rem 0; font-size: .98rem; }
 .be-notice h3 .be-ic { font-size: 1.05rem; vertical-align: -.17em; margin-right: .4rem; color: inherit; }
 .be-notice p  { margin: 0; }
-.be-notice--error   { background: var(--be-danger-bg); border-color: #f3c9d1; color: var(--be-danger); }
-.be-notice--warning { background: var(--be-warn-bg);   border-color: #f0ddb0; color: var(--be-warn); }
-.be-notice--info    { background: #e2f4fb;             border-color: #c3e6f5; color: #075985; }
+.be-notice--error   { background: var(--be-danger-bg); border-color: rgba(244, 63, 94, .3);  color: var(--be-danger); }
+.be-notice--warning { background: var(--be-warn-bg);   border-color: rgba(245, 158, 11, .3); color: var(--be-warn); }
+.be-notice--info    { background: rgba(14, 116, 144, .18); border-color: rgba(34, 211, 238, .25); color: #7fe0f2; }
 
 /* ------------------------------------------------------------------ */
 /* Empty states                                                         */
@@ -286,10 +289,10 @@ html, body, [class*="css"], .stApp {
   width: 64px; height: 64px; border-radius: 18px;
   display: flex; align-items: center; justify-content: center;
   margin: 0 auto .65rem;
-  background: linear-gradient(135deg, #e6f5fc, #d7eefa);
-  border: 1px solid #c8e6f4;
+  background: linear-gradient(135deg, rgba(34, 211, 238, .16), rgba(34, 211, 238, .05));
+  border: 1px solid rgba(34, 211, 238, .22);
 }
-.be-empty .tile .be-ic { font-size: 2rem; color: #0e7ba8; }
+.be-empty .tile .be-ic { font-size: 2rem; color: #7dd3fc; }
 .be-empty .be-card-title { font-size: 1.02rem; margin-top: .1rem; }
 .be-empty p { max-width: 460px; margin: .1rem auto 0; }
 
@@ -424,17 +427,17 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 }
 .be-nav-card:hover {
   transform: translateY(-2px);
-  border-color: #b7dcec;
-  box-shadow: 0 6px 16px rgba(7, 32, 60, .09), 0 16px 32px rgba(7, 32, 60, .09);
+  border-color: #2c6f96;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .35), 0 18px 40px rgba(0, 0, 0, .35);
 }
 .be-nav-card .ic {
   width: 42px; height: 42px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #e2f4fb, #d5edf9);
-  border: 1px solid #c4e4f3;
+  background: linear-gradient(135deg, rgba(34, 211, 238, .16), rgba(34, 211, 238, .05));
+  border: 1px solid rgba(34, 211, 238, .22);
   margin-bottom: .65rem;
 }
-.be-nav-card .ic .be-ic { color: #0e7ba8; font-size: 1.35rem; }
+.be-nav-card .ic .be-ic { color: #7dd3fc; font-size: 1.35rem; }
 .be-nav-card h4 { margin: 0 0 .3rem 0; font-size: 1rem; color: var(--be-text); }
 .be-nav-card p { margin: 0; color: var(--be-muted); font-size: .83rem; line-height: 1.45; }
 .be-nav-card .be-ic--inline { color: var(--be-cyan); }
@@ -450,7 +453,7 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 /* Species detail lists (facts / verified references). */
 .be-facts, .be-reflist { margin: .1rem 0 .6rem; padding-left: 1.15rem; }
 .be-facts li, .be-reflist li { color: var(--be-text); font-size: .88rem; margin-bottom: .3rem; }
-.be-reflist a { color: #0e7490; text-decoration: none; border-bottom: 1px solid #a7d3e2; }
+.be-reflist a { color: #67e8f9; text-decoration: none; border-bottom: 1px solid rgba(103, 232, 249, .35); }
 .be-reflist a:hover { color: var(--be-cyan); border-bottom-color: var(--be-cyan); }
 
 /* Subtle responsible-use band. */
@@ -521,10 +524,10 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 .be-feed .item .tile {
   flex: none; width: 34px; height: 34px; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #e2f4fb, #d5edf9);
-  border: 1px solid #c4e4f3;
+  background: linear-gradient(135deg, rgba(34, 211, 238, .16), rgba(34, 211, 238, .05));
+  border: 1px solid rgba(34, 211, 238, .22);
 }
-.be-feed .item .tile .be-ic { color: #0e7ba8; font-size: 1.15rem; }
+.be-feed .item .tile .be-ic { color: #7dd3fc; font-size: 1.15rem; }
 .be-feed .item .body { min-width: 0; flex: 1; }
 .be-feed .item .fn { font-size: .9rem; font-weight: 600; color: var(--be-text); overflow-wrap: anywhere; }
 .be-feed .item .meta { color: var(--be-muted); font-size: .78rem; margin-top: .1rem; }
@@ -583,11 +586,11 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
   color: var(--be-muted); font-size: .88rem; font-weight: 600; margin: 0;
 }
 [data-testid="stMain"] [data-testid="stRadioGroup"][aria-orientation="horizontal"] label[data-testid="stRadioOption"]:hover {
-  background: #ffffff;
+  background: rgba(255, 255, 255, .07);
 }
 [data-testid="stMain"] [data-testid="stRadioGroup"][aria-orientation="horizontal"] label[data-testid="stRadioOption"]:has(input:checked) {
   background: linear-gradient(135deg, var(--be-blue) 0%, var(--be-cyan) 100%);
-  box-shadow: 0 2px 8px rgba(11, 58, 102, .28);
+  box-shadow: 0 2px 10px rgba(8, 145, 178, .4);
 }
 [data-testid="stMain"] [data-testid="stRadioGroup"][aria-orientation="horizontal"] label[data-testid="stRadioOption"]:has(input:checked) p {
   color: #ffffff;
@@ -604,18 +607,18 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 /* ------------------------------------------------------------------ */
 [data-testid="stFileUploader"] { width: 100% !important; }
 [data-testid="stFileUploaderDropzone"] {
-  border: 2px dashed #a7cfe3 !important;
-  background: linear-gradient(180deg, #f7fbfe 0%, #eef6fb 100%) !important;
+  border: 2px dashed rgba(125, 195, 235, .35) !important;
+  background: linear-gradient(180deg, rgba(13, 36, 62, .85) 0%, rgba(9, 26, 45, .85) 100%) !important;
   border-radius: 16px !important;
   padding: 1.7rem 1.25rem !important;
   transition: border-color .15s ease, background-color .15s ease;
 }
 [data-testid="stFileUploaderDropzone"]:hover {
-  border-color: var(--be-cyan) !important;
-  background: linear-gradient(180deg, #f2fafd 0%, #e9f5fb 100%) !important;
+  border-color: var(--be-cyan-lit) !important;
+  background: linear-gradient(180deg, rgba(15, 44, 78, .9) 0%, rgba(10, 30, 52, .9) 100%) !important;
 }
 [data-testid="stFileUploaderDropzone"] [data-testid="stFileUploaderDropzoneInstructions"] {
-  color: #5d748a; font-size: .82rem;
+  color: #9fc3da; font-size: .82rem;
 }
 [data-testid="stFileUploaderDropzone"] button {
   background: linear-gradient(135deg, var(--be-blue) 0%, var(--be-cyan) 100%) !important;
@@ -650,14 +653,14 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 [data-testid="stBaseButton-primary"]:active { transform: translateY(0); }
 [data-testid="stBaseButton-secondary"] {
   border: 1px solid var(--be-border) !important;
-  background: #ffffff !important;
-  color: var(--be-blue) !important;
+  background: rgba(255, 255, 255, .05) !important;
+  color: var(--be-text) !important;
   font-weight: 600 !important;
   border-radius: 10px !important;
 }
 [data-testid="stBaseButton-secondary"]:hover {
-  border-color: #a9cbdf !important;
-  background: var(--be-surface-2) !important;
+  border-color: #2c6f96 !important;
+  background: rgba(255, 255, 255, .09) !important;
 }
 
 /* ------------------------------------------------------------------ */
@@ -740,8 +743,255 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 [data-testid="stDataFrame"] div[data-testid="stHorizontalScrollbar"] { visibility: hidden; }
 
 /* ------------------------------------------------------------------ */
+/* Dashboard - cinematic hero band                                      */
+/* ------------------------------------------------------------------ */
+.be-mhero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--be-radius);
+  border: 1px solid rgba(125, 195, 235, .18);
+  box-shadow: var(--be-shadow);
+  min-height: 330px;
+  padding: 2.6rem 2.2rem 2.1rem;
+  margin-bottom: .4rem;
+  background-size: cover;
+  background-position: center 28%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.be-mhero .eyebrow {
+  display: inline-flex; align-items: center; gap: .45rem;
+  color: #67e8f9; font-size: .78rem; font-weight: 600;
+  letter-spacing: .24em; text-transform: uppercase; margin-bottom: .5rem;
+}
+.be-mhero .eyebrow .be-ic { font-size: 1rem; }
+.be-mhero h1 {
+  color: #ffffff; margin: 0 0 .4rem 0;
+  font-size: 2.55rem; font-weight: 750; line-height: 1.08;
+  letter-spacing: .4px; text-shadow: 0 2px 20px rgba(0, 0, 0, .45);
+}
+.be-mhero p {
+  color: #d3eaf8; font-size: 1.02rem; line-height: 1.5;
+  max-width: 640px; margin: 0 0 1.25rem 0;
+}
+.be-cta {
+  display: inline-flex; align-items: center; gap: .55rem;
+  width: fit-content;
+  background: linear-gradient(135deg, var(--be-blue) 0%, var(--be-cyan) 100%);
+  border: 1px solid rgba(103, 232, 249, .35);
+  color: #ffffff; font-weight: 600; font-size: .95rem; text-decoration: none;
+  padding: .72rem 1.45rem; border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(8, 145, 178, .4);
+  transition: filter .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+.be-cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.be-cta .arr { font-size: 1.1rem; line-height: 1; }
+
+/* Dashboard - marine statistic cards */
+.be-mstat {
+  display: flex; align-items: center; gap: .85rem;
+  background: var(--be-surface);
+  border: 1px solid var(--be-border);
+  border-radius: var(--be-radius-sm);
+  box-shadow: var(--be-shadow);
+  padding: .95rem 1rem;
+  height: 100%;
+}
+.be-mstat .ic {
+  flex: none; width: 46px; height: 46px; border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, rgba(11, 58, 102, .7), rgba(8, 145, 178, .35));
+  border: 1px solid rgba(34, 211, 238, .25);
+}
+.be-mstat .ic .be-ic { color: #67e8f9; font-size: 1.5rem; }
+.be-mstat .bd { min-width: 0; }
+.be-mstat .v {
+  font-size: 1.6rem; font-weight: 700; line-height: 1.2;
+  color: var(--be-text); font-variant-numeric: tabular-nums;
+}
+.be-mstat .k {
+  color: var(--be-muted); font-size: .76rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .6px;
+}
+.be-mstat .h { color: var(--be-muted); font-size: .74rem; margin-top: .1rem; }
+.be-mstatgrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .7rem;
+  margin-bottom: .95rem;
+}
+
+/* Dashboard - latest detection comparison */
+.be-cmp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) minmax(0, 1.02fr);
+  gap: .85rem;
+  align-items: stretch;
+  margin-bottom: .5rem;
+}
+.be-cmp .panel {
+  background: var(--be-surface);
+  border: 1px solid var(--be-border);
+  border-radius: var(--be-radius-sm);
+  box-shadow: var(--be-shadow);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.be-cmp .panel .media {
+  flex: 1 1 auto;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 70% 20%, #0a243e 0%, #061423 70%);
+  min-height: 200px;
+}
+.be-cmp .panel .media img { display: block; width: 100%; height: auto; }
+.be-cmp .panel .media .ph { color: var(--be-muted); font-size: .86rem; padding: 1rem; text-align: center; }
+.be-cmp .panel .lbl {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .5rem .8rem;
+  border-top: 1px solid var(--be-border);
+  background: rgba(255, 255, 255, .025);
+  font-size: .74rem; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--be-muted);
+}
+.be-cmp .panel .lbl .be-ic { font-size: 1rem; color: #7dd3fc; }
+.be-cmp .arrow { display: flex; align-items: center; justify-content: center; }
+.be-cmp .arrow .be-ic { font-size: 1.7rem; color: #67e8f9; }
+.be-cmp .panel--c .detail { padding: .8rem 1rem; }
+.be-cmp .panel--c .detail .be-kv { margin-top: .15rem; }
+.be-cmp .panel--c .detail .be-link { display: inline-flex; align-items: center; gap: .3rem; margin-top: .5rem; }
+.be-cmp .panel--c .lbl { border-top: none; border-bottom: 1px solid var(--be-border); }
+.be-cmp .panel--span { grid-column: 1 / -1; }
+
+/* Dashboard - text links & small "view" links */
+.be-link {
+  color: #67e8f9; font-size: .85rem; font-weight: 600; text-decoration: none;
+  border-bottom: 1px solid rgba(103, 232, 249, .4);
+}
+.be-link:hover { border-bottom-color: transparent; }
+.be-view {
+  color: #67e8f9; font-size: .8rem; font-weight: 600; text-decoration: none;
+  white-space: nowrap; margin-left: .4rem;
+}
+.be-view:hover { text-decoration: underline; }
+
+/* Dashboard - Indian marine biodiversity */
+.be-bio-featured {
+  display: flex; align-items: flex-start; gap: 1.05rem;
+  background: var(--be-surface);
+  border: 1px solid var(--be-border);
+  border-left: 4px solid var(--be-cyan);
+  border-radius: var(--be-radius);
+  box-shadow: var(--be-shadow);
+  padding: 1.05rem 1.2rem;
+  margin-bottom: .7rem;
+}
+.be-bio-featured .photo {
+  flex: none; width: 88px; height: 88px; border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 30% 25%, rgba(34, 211, 238, .28), rgba(11, 58, 102, .55));
+  border: 1px solid rgba(34, 211, 238, .3);
+}
+.be-bio-featured .photo .be-ic { font-size: 2.7rem; color: #a5ecfb; }
+.be-bio-featured h4 { margin: 0 0 .12rem 0; font-size: 1.14rem; color: var(--be-text); }
+.be-bio-featured .sci { color: #7dd3fc; font-size: .9rem; font-style: italic; margin: 0 0 .35rem 0; }
+.be-bio-featured .meta { color: var(--be-muted); font-size: .84rem; line-height: 1.5; margin: .2rem 0 .55rem; }
+.be-bio-featured .badges { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .6rem; }
+.be-bio-mini {
+  display: flex; flex-direction: column; gap: .3rem;
+  background: var(--be-surface);
+  border: 1px solid var(--be-border);
+  border-radius: var(--be-radius-sm);
+  box-shadow: var(--be-shadow);
+  padding: .85rem .95rem;
+  height: 100%;
+}
+.be-bio-mini .row { display: flex; align-items: center; gap: .6rem; }
+.be-bio-mini .row .ic {
+  flex: none; width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, rgba(11, 58, 102, .7), rgba(8, 145, 178, .35));
+  border: 1px solid rgba(34, 211, 238, .22);
+}
+.be-bio-mini .row .ic .be-ic { color: #7dd3fc; font-size: 1.15rem; }
+.be-bio-mini h4 { margin: 0; font-size: .95rem; line-height: 1.25; color: var(--be-text); }
+.be-bio-mini .sci { color: var(--be-muted); font-size: .78rem; font-style: italic; margin: 0; }
+.be-bio-mini .st { margin-top: auto; padding-top: .35rem; }
+.be-biogrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .7rem;
+  margin-bottom: .95rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Marine Areas Map                                                     */
+/* ------------------------------------------------------------------ */
+/* Species result grid (scoped to the Map page). */
+.be-mapgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: .7rem;
+  margin-bottom: .95rem;
+}
+.be-map-species {
+  display: flex; flex-direction: column; gap: .45rem;
+  background: var(--be-surface);
+  border: 1px solid var(--be-border);
+  border-radius: var(--be-radius-sm);
+  box-shadow: var(--be-shadow);
+  padding: .9rem 1rem;
+  height: 100%;
+}
+.be-map-species .head { display: flex; align-items: center; gap: .65rem; }
+.be-map-species .head .ic {
+  flex: none; width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, rgba(11, 58, 102, .7), rgba(8, 145, 178, .35));
+  border: 1px solid rgba(34, 211, 238, .22);
+}
+.be-map-species .head .ic .be-ic { color: #7dd3fc; font-size: 1.4rem; }
+.be-map-species h4 { margin: 0; font-size: .98rem; color: var(--be-text); }
+.be-map-species .sci { color: var(--be-muted); font-size: .8rem; font-style: italic; margin: 0; }
+.be-map-species .tags { display: flex; flex-wrap: wrap; gap: .35rem; }
+.be-map-species .about { color: var(--be-muted); font-size: .82rem; line-height: 1.5; margin: 0; }
+.be-map-species .foot {
+  margin-top: auto; padding-top: .35rem;
+  display: flex; align-items: center; justify-content: space-between; gap: .4rem;
+}
+.be-map-species .foot .loc {
+  color: var(--be-muted); font-size: .76rem;
+  display: inline-flex; align-items: center; gap: .25rem; min-width: 0;
+}
+.be-map-species .foot .loc .be-ic { color: #67e8f9; font-size: 1rem; }
+
+/* Selected-location panel beside the map. */
+.be-map-area h4 { margin: .3rem 0 .15rem; font-size: 1.06rem; color: var(--be-text); }
+.be-map-area .tags { margin-bottom: .35rem; }
+.be-map-area .note { color: var(--be-muted); font-size: .84rem; line-height: 1.5; margin: 0 0 .5rem; }
+.be-map-legend { margin-top: .6rem; border-top: 1px dashed var(--be-border); padding-top: .5rem; }
+.be-map-legend .row {
+  display: flex; align-items: center; gap: .4rem;
+  margin: .28rem 0; color: var(--be-muted); font-size: .78rem;
+}
+
+/* OBIS source / attribution note. */
+.be-obs-src { margin-top: .35rem; }
+.be-obs-src p { color: var(--be-muted); font-size: .76rem; line-height: 1.5; margin: .3rem 0 0; }
+
+/* ------------------------------------------------------------------ */
 /* Responsive                                                           */
 /* ------------------------------------------------------------------ */
+/* Comparison and stat grids adapt to medium screens first. */
+@media (max-width: 1300px) {
+  .be-cmp {
+    grid-template-columns: 1fr;
+    gap: .7rem;
+  }
+  .be-cmp .arrow { display: none; }
+  .be-mstatgrid, .be-biogrid { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 900px) {
   .be-hero { padding: 1.1rem 1.15rem; }
   .be-hero h1 { font-size: 1.5rem; }
@@ -754,6 +1004,15 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
   .be-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
   .be-flow .fstep { flex: 1 1 100%; }
   .be-flow .farr { display: none; }
+
+  /* Marine hero tightens up on small screens. */
+  .be-mhero { min-height: 0; padding: 1.7rem 1.3rem 1.4rem; }
+  .be-mhero h1 { font-size: 1.85rem; }
+  .be-mhero p { font-size: .93rem; }
+  .be-bio-featured { flex-direction: column; }
+  .be-bio-featured .photo { width: 64px; height: 64px; }
+  .be-bio-featured .photo .be-ic { font-size: 2rem; }
+
   /* Stack main-area columns so cards, the hero and the workflow stay usable
      on narrow screens instead of being squeezed side by side. */
   [data-testid="stMain"] [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; }
@@ -762,6 +1021,10 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
     width: 100% !important;
     min-width: 0 !important;
   }
+}
+
+@media (max-width: 640px) {
+  .be-mstatgrid, .be-biogrid, .be-mapgrid { grid-template-columns: 1fr; }
 }
 </style>
 """
