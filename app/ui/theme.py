@@ -25,26 +25,26 @@ import streamlit as st
 #:
 #: ``detect_image`` and ``detect_video`` both open the same Detect workflow
 #: with the matching media type preselected, so the sidebar can offer direct
-#: "Detect Image" / "Detect Video" entry points without duplicating code.
+#: "Detect an Image" / "Analyse a Video" entry points without duplicating
+#: code.
 PAGES: tuple[tuple[str, str, str], ...] = (
     ("dashboard", "Dashboard", "home"),
-    ("detect_image", "Detect Image", "image"),
-    ("detect_video", "Detect Video", "videocam"),
+    ("detect_image", "Detect an Image", "image"),
+    ("detect_video", "Analyse a Video", "videocam"),
+    ("history", "Detection History", "history"),
     ("species", "Species Explorer", "menu_book"),
-    ("models", "Models", "psychology"),
+    ("models", "AI Models", "psychology"),
     ("analytics", "Analytics", "bar_chart"),
-    ("history", "History", "history"),
-    ("about", "About", "info"),
+    ("about", "About BlueEye", "info"),
+    ("help", "Help & Documentation", "help"),
 )
 
 #: Sidebar section grouping: (section title, page ids in display order).
 #: The ids must match :data:`PAGES`; section headers are rendered by CSS.
 NAV_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Overview", ("dashboard",)),
-    ("Detection", ("detect_image", "detect_video")),
-    ("Explore", ("species", "models", "analytics")),
-    ("Activity", ("history",)),
-    ("Information", ("about",)),
+    ("Main", ("dashboard", "detect_image", "detect_video")),
+    ("Explore", ("history", "species", "models", "analytics")),
+    ("Information", ("about", "help")),
 )
 
 #: Page ids that render the shared Detect workflow and the media type each
@@ -395,25 +395,151 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 }
 .be-side-head .be-ic { color: #67e8f9; font-size: .95rem; }
 
-/* Compact single-line readiness indicator (model detail lives on Models). */
-.be-side-status {
-  display: flex; align-items: center; gap: .45rem;
-  font-size: .84rem; font-weight: 600;
-  border-radius: 9px; padding: .4rem .6rem; margin: .2rem 0 .35rem;
+/* ------------------------------------------------------------------ */
+/* Sidebar balance (brand -> navigation only)                          */
+/* ------------------------------------------------------------------ */
+.be-brand { margin-bottom: .35rem; }
+
+/* ------------------------------------------------------------------ */
+/* Landing page (dashboard)                                            */
+/* ------------------------------------------------------------------ */
+.be-section-lead {
+  color: var(--be-muted);
+  font-size: .9rem;
+  margin: -.35rem 0 .9rem;
 }
-.be-side-status .be-ic { font-size: 1rem; }
-.be-side-status--ok {
-  color: #7ff0cf;
-  background: rgba(16, 185, 129, .13);
-  border: 1px solid rgba(16, 185, 129, .28);
+
+/* Action card used by the dashboard navigation grid. */
+.be-nav-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 200px;
+  background: var(--be-surface);
+  border: 1px solid var(--be-border);
+  border-radius: var(--be-radius);
+  box-shadow: var(--be-shadow);
+  padding: 1.05rem 1.1rem;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
-.be-side-status--ok .be-ic { color: #7ff0cf; }
-.be-side-status--warn {
-  color: #ffd9a1;
-  background: rgba(234, 179, 8, .13);
-  border: 1px solid rgba(234, 179, 8, .3);
+.be-nav-card:hover {
+  transform: translateY(-2px);
+  border-color: #b7dcec;
+  box-shadow: 0 6px 16px rgba(7, 32, 60, .09), 0 16px 32px rgba(7, 32, 60, .09);
 }
-.be-side-status--warn .be-ic { color: #f6c86a; }
+.be-nav-card .ic {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #e2f4fb, #d5edf9);
+  border: 1px solid #c4e4f3;
+  margin-bottom: .65rem;
+}
+.be-nav-card .ic .be-ic { color: #0e7ba8; font-size: 1.35rem; }
+.be-nav-card h4 { margin: 0 0 .3rem 0; font-size: 1rem; color: var(--be-text); }
+.be-nav-card p { margin: 0; color: var(--be-muted); font-size: .83rem; line-height: 1.45; }
+.be-nav-card .be-ic--inline { color: var(--be-cyan); }
+
+/* Species preview card (dashboard -> Species Explorer). */
+.be-species-card { min-height: 168px; display: flex; flex-direction: column; }
+.be-species-card .be-card-title { line-height: 1.3; }
+.be-species-card .be-chip { margin-top: .15rem; }
+
+/* Scientific name shown under the main heading in a detail hero. */
+.be-hero .sci { color: #a9d6ec; font-size: 1.02rem; margin-top: .15rem; }
+
+/* Species detail lists (facts / verified references). */
+.be-facts, .be-reflist { margin: .1rem 0 .6rem; padding-left: 1.15rem; }
+.be-facts li, .be-reflist li { color: var(--be-text); font-size: .88rem; margin-bottom: .3rem; }
+.be-reflist a { color: #0e7490; text-decoration: none; border-bottom: 1px solid #a7d3e2; }
+.be-reflist a:hover { color: var(--be-cyan); border-bottom-color: var(--be-cyan); }
+
+/* Subtle responsible-use band. */
+.be-responsible {
+  display: flex; align-items: flex-start; gap: .7rem;
+  background: var(--be-surface-2);
+  border: 1px solid var(--be-border);
+  border-left: 3px solid var(--be-cyan);
+  border-radius: var(--be-radius-sm);
+  padding: .85rem 1rem;
+  font-size: .86rem; color: var(--be-muted);
+}
+.be-responsible .be-ic { color: var(--be-cyan); font-size: 1.2rem; flex: none; }
+.be-responsible b { color: var(--be-text); }
+
+/* ------------------------------------------------------------------ */
+/* Dashboard (product landing page)                                    */
+/* ------------------------------------------------------------------ */
+/* Status row inside the dashboard header band (real readiness + device). */
+.be-hero .be-statusrow {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+  margin-top: .85rem;
+}
+.be-hero .be-statusrow .dev { color: #9fc3da; font-size: .8rem; }
+
+/* Short muted lead under a section heading. */
+.be-dash-lead { color: var(--be-muted); font-size: .9rem; margin: -.2rem 0 .85rem; }
+
+/* Responsive statistic grid for the dashboard summary cards. */
+.be-statgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: .7rem;
+  margin-bottom: .35rem;
+}
+.be-statgrid .be-metric { margin: 0; }
+
+/* Primary action panels (Detect an Image / Analyse a Video). */
+.be-action {
+  display: flex; flex-direction: column; height: 100%;
+  background: var(--be-surface);
+  border: 1px solid var(--be-border);
+  border-top: 3px solid var(--be-cyan);
+  border-radius: var(--be-radius);
+  box-shadow: var(--be-shadow);
+  padding: 1.1rem 1.15rem .95rem;
+}
+.be-action .ic {
+  width: 44px; height: 44px; border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--be-blue) 0%, var(--be-cyan) 100%);
+  margin-bottom: .7rem;
+}
+.be-action .ic .be-ic { color: #ffffff; font-size: 1.4rem; }
+.be-action h4 { margin: 0 0 .3rem 0; font-size: 1.05rem; color: var(--be-text); }
+.be-action p { margin: 0 0 .85rem 0; color: var(--be-muted); font-size: .86rem; line-height: 1.5; }
+.be-action .spacer { flex: 1 1 auto; }
+
+/* Recent-activity feed rows. */
+.be-feed { display: flex; flex-direction: column; gap: .5rem; }
+.be-feed .item {
+  display: flex; align-items: flex-start; gap: .7rem;
+  background: var(--be-surface);
+  border: 1px solid var(--be-border);
+  border-radius: var(--be-radius-sm);
+  padding: .6rem .75rem;
+}
+.be-feed .item .tile {
+  flex: none; width: 34px; height: 34px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #e2f4fb, #d5edf9);
+  border: 1px solid #c4e4f3;
+}
+.be-feed .item .tile .be-ic { color: #0e7ba8; font-size: 1.15rem; }
+.be-feed .item .body { min-width: 0; flex: 1; }
+.be-feed .item .fn { font-size: .9rem; font-weight: 600; color: var(--be-text); overflow-wrap: anywhere; }
+.be-feed .item .meta { color: var(--be-muted); font-size: .78rem; margin-top: .1rem; }
+.be-feed .item .species { margin-top: .3rem; }
+.be-feed .item .st { flex: none; }
+
+/* Model-status rows (dashboard right column). */
+.be-modelrow {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .48rem .1rem;
+  border-bottom: 1px dashed var(--be-border);
+}
+.be-modelrow:last-child { border-bottom: none; }
+.be-modelrow .nm { flex: 1 1 auto; min-width: 0; font-size: .9rem; font-weight: 600; color: var(--be-text); overflow-wrap: anywhere; }
+.be-modelrow .nm .sub { display: block; color: var(--be-muted); font-size: .76rem; font-weight: 400; }
 
 /* ------------------------------------------------------------------ */
 /* Segmented control (Detect page media selector)                      */
@@ -585,6 +711,12 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
   max-width: 100%;
 }
 .be-flow .fstep .txt { font-size: .86rem; font-weight: 600; color: var(--be-text); }
+.be-flow .fstep .n {
+  flex: none; width: 22px; height: 22px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--be-blue), var(--be-cyan));
+  color: #ffffff; font-size: .72rem; font-weight: 700;
+}
 .be-flow .farr { align-self: center; flex: none; }
 .be-flow .farr .be-ic { color: #9db4c6; font-size: 1rem; }
 
@@ -615,10 +747,21 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
   .be-hero h1 { font-size: 1.5rem; }
   .be-metric .v { font-size: 1.3rem; }
   .be-card { padding: .9rem 1rem; }
+  .be-nav-card { min-height: 0; }
+  .be-species-card { min-height: 0; }
+  .be-statgrid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   [data-testid="stFileUploaderDropzone"] { padding: 1.2rem .9rem !important; }
   .be-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
   .be-flow .fstep { flex: 1 1 100%; }
   .be-flow .farr { display: none; }
+  /* Stack main-area columns so cards, the hero and the workflow stay usable
+     on narrow screens instead of being squeezed side by side. */
+  [data-testid="stMain"] [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; }
+  [data-testid="stMain"] [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
 }
 </style>
 """

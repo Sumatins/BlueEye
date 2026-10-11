@@ -25,13 +25,13 @@ import logging  # noqa: E402
 import streamlit as st  # noqa: E402
 
 from app import __version__  # noqa: E402
-from app.detection.model_manager import ModelError  # noqa: E402
 from app.ui import state  # noqa: E402
 from app.ui.pages import (  # noqa: E402
     about,
     analytics,
     dashboard,
     detect,
+    help_page,
     history_page,
     models,
     species,
@@ -52,6 +52,7 @@ PAGE_MODULES = {
     "analytics": analytics,
     "history": history_page,
     "about": about,
+    "help": help_page,
 }
 
 # Re-exported for backwards compatibility with earlier versions of this file.
@@ -62,8 +63,14 @@ get_settings_cached = state.get_settings_cached
 # --------------------------------------------------------------------------- #
 # Sidebar
 # --------------------------------------------------------------------------- #
-def _sidebar(detector, settings) -> str:
-    """Render brand + navigation + system status; returns the active page."""
+def _sidebar() -> str:
+    """Render the brand and navigation; returns the active page.
+
+    The sidebar is deliberately minimal - logo, project name, tagline and the
+    grouped navigation. Model counts, readiness badges, repository credits and
+    technical notes live on the pages that own them (Models, About), never
+    here.
+    """
     with st.sidebar:
         # Brand block. Section grouping and icons come from the design
         # system (theme.PAGES / theme.NAV_GROUPS) - the nav stays the single
@@ -89,54 +96,7 @@ def _sidebar(detector, settings) -> str:
             index=0,
             help="Jump between BlueEye sections.",
         )
-
-        st.write("")
-        _sidebar_status(detector)
-        st.caption(
-            "Models: marine-detect by Orange OpenSource (AGPL-3.0). "
-            "Weights are downloaded on demand - never fabricated."
-        )
     return page
-
-
-def _sidebar_status(detector) -> None:
-    """One compact readiness indicator.
-
-    The individual model names, counts and badges deliberately live on the
-    Models page only (single source of truth); the sidebar keeps just enough
-    signal to know whether inference can run, plus the download action when
-    nothing is installed yet.
-    """
-    if state.available_keys(detector):
-        st.markdown(
-            '<div class="be-side-status be-side-status--ok">'
-            f'{span("check_circle")}<span>Inference ready</span></div>',
-            unsafe_allow_html=True,
-        )
-        st.caption("Model availability, classes and licences are on the Models page.")
-        return
-
-    st.markdown(
-        '<div class="be-side-status be-side-status--warn">'
-        f'{span("error")}<span>No models installed</span></div>',
-        unsafe_allow_html=True,
-    )
-    if st.button(
-        "Download model weights",
-        type="primary",
-        icon=":material/download:",
-        width="stretch",
-        key="sidebar_download",
-    ):
-        try:
-            with st.spinner("Downloading missing model weights..."):
-                detector.model_manager.download_all()
-            st.cache_resource.clear()
-            st.rerun()
-        except ModelError as exc:
-            logger.warning("Model download failed: %s", exc)
-            st.error(str(exc))
-    st.caption("Or run `python scripts/download_models.py` in the project directory.")
 
 
 # --------------------------------------------------------------------------- #
@@ -155,9 +115,9 @@ def main() -> None:
     detector = state.get_detector()
     state.init_session(settings)
 
-    page = _sidebar(detector, settings)
+    page = _sidebar()
 
-    # "Detect Image" / "Detect Video" are two entry points into the one
+    # "Detect an Image" / "Analyse a Video" are two entry points into the one
     # Detect workflow; preselect the media type before the page renders.
     media = DETECT_PAGES.get(page)
     if media:
@@ -167,10 +127,7 @@ def main() -> None:
     module.render(detector, settings)
 
     st.divider()
-    st.caption(
-        f"BlueEye v{__version__} · See beneath the surface · "
-        "built on marine-detect (Orange OpenSource, AGPL-3.0-only)."
-    )
+    st.caption(f"BlueEye v{__version__} · See beneath the surface")
 
 
 if __name__ == "__main__":

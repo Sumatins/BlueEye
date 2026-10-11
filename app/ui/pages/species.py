@@ -25,6 +25,7 @@ from app.content.species import (
 )
 from app.detection.detector import MarineDetector
 from app.ui.components import badge, chips, hero, notice
+from app.ui.icons import span
 from app.ui.theme import esc
 
 #: Badge colour per detection capability.
@@ -127,7 +128,7 @@ def _filters_and_grid() -> None:
 
 def _card(species: Species) -> None:
     st.markdown(
-        '<div class="be-card">'
+        '<div class="be-card be-species-card">'
         f'<div class="be-card-title">{esc(species.common_name)}</div>'
         f"<p class='be-card-sub'><em>{esc(species.scientific_name)}</em></p>"
         f"<div style='margin:.2rem 0 .45rem'>{_detection_badge(species.detection)}</div>"
@@ -149,45 +150,55 @@ def _card(species: Species) -> None:
 # Detail view
 # --------------------------------------------------------------------------- #
 def _detail(species: Species) -> None:
-    if st.button(
-        "Back to species list",
-        icon=":material/arrow_back:",
-        key="species_back",
-    ):
-        st.session_state.pop(_SELECTED_KEY, None)
-        st.rerun()
-
-    hero(
-        st,
-        species.group,
-        species.common_name,
-        species.scientific_name,
-        icon="menu_book",
-    )
+    _back_button(key="species_back")
 
     st.markdown(
-        f"<div>{chips((species.habitat, species.group))}</div>",
+        '<div class="be-hero">'
+        f'<div class="be-tag">{span("menu_book")}{esc(species.group)}</div>'
+        f"<h1>{esc(species.common_name)}</h1>"
+        f'<p class="sci"><em>{esc(species.scientific_name)}</em></p></div>',
         unsafe_allow_html=True,
     )
     st.markdown(
-        f"<p>{esc(species.appearance)}</p>",
+        f"<div>{chips((species.habitat, species.group))} "
+        f"{_detection_badge(species.detection)}</div>",
         unsafe_allow_html=True,
     )
 
-    left, right = st.columns(2)
-    with left:
-        _field("Scientific name", species.scientific_name)
-        _field("Group", species.group)
-        _field("Habitat", species.habitat)
-        _field("Distribution (with Indian relevance)", species.distribution)
-        _field("Diet", species.diet)
-    with right:
-        _field("Ecological role", species.ecological_role)
-        _field("Conservation status", species.conservation_status)
-        _field("Status source", species.conservation_source)
-        _field("Interesting fact", species.interesting_fact)
+    _heading("Overview")
+    st.markdown(f"<p>{esc(species.overview)}</p>", unsafe_allow_html=True)
+    _two_columns(
+        [("Identification", species.identification)],
+        [("Habitat", species.habitat_notes)],
+    )
 
-    st.markdown("### Can BlueEye detect this species?")
+    _heading("Habitat and distribution")
+    st.markdown(f"<p>{esc(species.distribution)}</p>", unsafe_allow_html=True)
+
+    _heading("Diet and behaviour")
+    _two_columns(
+        [("Diet", species.diet)],
+        [("Behaviour", species.behaviour)],
+    )
+
+    _heading("Ecological importance")
+    st.markdown(f"<p>{esc(species.ecological_role)}</p>", unsafe_allow_html=True)
+
+    _heading("Conservation")
+    _two_columns(
+        [("Threats", species.threats)],
+        [
+            ("Conservation status", species.conservation_status),
+            ("Status source", species.conservation_source),
+        ],
+    )
+    _field("Conservation actions", species.conservation_actions)
+
+    _heading("Interesting facts")
+    facts = "".join(f"<li>{esc(fact)}</li>" for fact in species.facts)
+    st.markdown(f"<ul class='be-facts'>{facts}</ul>", unsafe_allow_html=True)
+
+    _heading("Can BlueEye detect this species?")
     st.markdown(
         f"<div class='be-card'><div class='be-card-title'>"
         f"{_detection_badge(species.detection)} "
@@ -195,6 +206,7 @@ def _detail(species: Species) -> None:
         f"<p class='be-card-sub'>{esc(species.detection_note)}</p></div>",
         unsafe_allow_html=True,
     )
+
     if species.image:
         st.image(
             species.image,
@@ -202,14 +214,35 @@ def _detail(species: Species) -> None:
             width="stretch",
         )
 
+    _heading("References")
+    _references(species.references)
+
+    _back_button(key="species_back_bottom", stretch=True)
+
+
+def _heading(text: str) -> None:
+    st.markdown(f"### {esc(text)}")
+
+
+def _back_button(key: str, stretch: bool = False) -> None:
     if st.button(
         "Back to species list",
         icon=":material/arrow_back:",
-        key="species_back_bottom",
-        width="stretch",
+        key=key,
+        width="stretch" if stretch else "content",
     ):
         st.session_state.pop(_SELECTED_KEY, None)
         st.rerun()
+
+
+def _two_columns(left: list[tuple[str, str]], right: list[tuple[str, str]]) -> None:
+    left_column, right_column = st.columns(2)
+    with left_column:
+        for label, value in left:
+            _field(label, value)
+    with right_column:
+        for label, value in right:
+            _field(label, value)
 
 
 def _field(label: str, value: str) -> None:
@@ -219,6 +252,19 @@ def _field(label: str, value: str) -> None:
         f"<div>{esc(value)}</div></div>",
         unsafe_allow_html=True,
     )
+
+
+def _references(references: tuple[tuple[str, str], ...]) -> None:
+    """Render the verified source links for a species profile."""
+    if not references:
+        st.caption("No external references recorded for this species.")
+        return
+    items = "".join(
+        f'<li><a href="{esc(url)}" target="_blank" rel="noopener noreferrer">'
+        f"{esc(label)}</a></li>"
+        for label, url in references
+    )
+    st.markdown(f"<ul class='be-reflist'>{items}</ul>", unsafe_allow_html=True)
 
 
 __all__ = ["render"]

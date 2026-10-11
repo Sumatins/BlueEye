@@ -29,18 +29,25 @@ def test_nav_offers_separate_image_and_video_entry_points() -> None:
 
 def test_required_navigation_links_are_present() -> None:
     labels = [label for _, label, _ in theme.PAGES]
-    for required in ("Dashboard", "Detect Image", "Detect Video", "Species Explorer",
-                     "Models", "Analytics", "History", "About"):
+    for required in (
+        "Dashboard",
+        "Detect an Image",
+        "Analyse a Video",
+        "Detection History",
+        "Species Explorer",
+        "AI Models",
+        "Analytics",
+        "About BlueEye",
+        "Help & Documentation",
+    ):
         assert required in labels
 
 
 def test_sidebar_groups_match_the_brief() -> None:
     grouped = {title: ids for title, ids in theme.NAV_GROUPS}
-    assert grouped["Overview"] == ("dashboard",)
-    assert grouped["Detection"] == ("detect_image", "detect_video")
-    assert grouped["Explore"] == ("species", "models", "analytics")
-    assert grouped["Activity"] == ("history",)
-    assert grouped["Information"] == ("about",)
+    assert grouped["Main"] == ("dashboard", "detect_image", "detect_video")
+    assert grouped["Explore"] == ("history", "species", "models", "analytics")
+    assert grouped["Information"] == ("about", "help")
 
 
 def test_detect_pages_preselect_media() -> None:
@@ -59,13 +66,33 @@ def test_nav_groups_cover_every_page_exactly_once() -> None:
     assert sorted(grouped) == sorted(page_id for page_id, _, _ in theme.PAGES)
 
 
-def test_sidebar_status_is_single_line() -> None:
-    """The sidebar must not list individual model names any more."""
+def test_sidebar_is_clean_of_status_and_repository_text() -> None:
+    """The sidebar keeps only brand + navigation.
+
+    The readiness badge, the "models on the Models page" caption and the
+    marine-detect credit must all be gone, and they must not be replaced by
+    another status panel or an orphaned download button.
+    """
     source = (PROJECT_ROOT / "app" / "ui" / "streamlit_app.py").read_text(encoding="utf-8")
-    status_block = source.split("def _sidebar_status")[1].split("def main")[0]
-    assert "spec.display_name" not in status_block
-    assert "models ready" not in status_block
-    assert "Inference ready" in status_block
+    sidebar_block = source.split("def _sidebar")[1].split("def main")[0]
+    for removed in (
+        "Inference ready",
+        "No models installed",
+        "Model availability, classes and licences are on the Models page.",
+        "marine-detect by Orange OpenSource",
+        "sidebar_download",
+        "download_all",
+        "_sidebar_status",
+    ):
+        assert removed not in sidebar_block, f"sidebar still contains: {removed}"
+    # The removal must not leave a leftover status function or dead CSS class.
+    assert "def _sidebar_status" not in source
+    assert "be-side-status" not in (PROJECT_ROOT / "app" / "ui" / "theme.py").read_text(
+        encoding="utf-8"
+    )
+    # Brand and every navigation entry are still there.
+    for kept in ("BlueEye", "See beneath the surface", "Navigation"):
+        assert kept in sidebar_block, f"sidebar lost: {kept}"
 
 
 def test_dashboard_has_required_sections() -> None:
@@ -73,19 +100,55 @@ def test_dashboard_has_required_sections() -> None:
         encoding="utf-8"
     )
     for marker in (
-        "Understand aquatic life",
+        # A. header + status
+        "BlueEye Dashboard",
+        "Detect and explore aquatic animals",
+        # B. summary cards
+        "Detection runs",
+        "Images analysed",
+        "Videos analysed",
+        "Unique species",
+        "AI models available",
+        # C. primary actions
+        "Start a detection",
         "Detect an Image",
         "Analyse a Video",
-        "Explore BlueEye",
-        "Biodiversity Analytics",
+        # D. recent activity
+        "Recent activity",
+        "Open Detection History",
+        # E. model status
+        "Model status",
+        "Inference device",
+        # retained value sections
         "How BlueEye works",
-        "Capabilities",
-        "Responsible use",
+        "Explore aquatic biodiversity",
+        "Responsible observation",
     ):
-        assert marker in source
-    # The negative-capabilities block and the duplicated history list are gone.
-    for removed in ("Recent detections", "Observation overview", "What BlueEye does not do"):
-        assert removed not in source
+        assert marker in source, f"missing dashboard section: {marker}"
+    # The negative-capabilities block and the old "Capabilities" narrative are
+    # gone, and the dashboard must not invent a "recent detections" list or
+    # hard-coded demo statistics.
+    for removed in (
+        "Observation overview",
+        "What BlueEye does not do",
+        "### Capabilities",
+        "Responsible use",
+        "sample_count",
+        "demo_count",
+    ):
+        assert removed not in source, f"dashboard still contains: {removed}"
+
+
+def test_dashboard_reads_real_history_and_registry() -> None:
+    """The dashboard summary must come from real sources, never hard-coded."""
+    source = (PROJECT_ROOT / "app" / "ui" / "pages" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    # History + model registry are the only data sources.
+    assert "load_entries" in source
+    assert "summarize" in source
+    assert "state.registry" in source
+    assert "state.available_keys" in source
 
 
 def test_registry_metrics_are_parsed(tmp_path) -> None:

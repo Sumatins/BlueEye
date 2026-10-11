@@ -9,6 +9,13 @@ headless = true
 [browser]
 gatherUsageStats = false
 
+# BlueEye renders its own 8-entry navigation in the sidebar (see
+# app/ui/theme.py: PAGES). Streamlit also auto-discovers the sibling
+# "pages/" directory as a multipage app, which would add a second,
+# duplicate navigation list; hide it so the sidebar stays clean.
+[client]
+showSidebarNavigation = false
+
 # BlueEye ocean design system (see app/ui/theme.py for the CSS tokens).
 [theme]
 base = "light"

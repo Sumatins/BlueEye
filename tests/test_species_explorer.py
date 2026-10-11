@@ -48,13 +48,36 @@ def test_every_species_has_its_required_facts() -> None:
         assert species.scientific_name.strip()
         assert species.group.strip()
         assert species.habitat.strip()
+        # Expanded educational profile (2024 review).
+        assert species.overview.strip()
+        assert species.identification.strip()
+        assert species.habitat_notes.strip()
         assert species.distribution.strip()
-        assert species.appearance.strip()
         assert species.diet.strip()
+        assert species.behaviour.strip()
         assert species.ecological_role.strip()
+        assert species.threats.strip()
         assert species.conservation_status.strip()
         assert species.conservation_source.strip()
-        assert species.interesting_fact.strip()
+        assert species.conservation_actions.strip()
+        assert len(species.facts) >= 1
+        assert all(fact.strip() for fact in species.facts)
+        assert species.references, f"{species.id} has no verified references"
+
+
+def test_scientific_names_are_unique() -> None:
+    names = [species.scientific_name for species in SPECIES]
+    assert len(names) == len(set(names)), "duplicate scientific names in the library"
+    common = [species.common_name for species in SPECIES]
+    assert len(common) == len(set(common)), "duplicate common names in the library"
+
+
+def test_references_are_well_formed_https_links() -> None:
+    for species in SPECIES:
+        for label, url in species.references:
+            assert label.strip(), f"{species.id} has an unlabelled reference"
+            assert url.startswith("https://"), f"{species.id} reference is not https: {url}"
+            assert " " not in url, f"{species.id} reference has a space: {url}"
 
 
 def test_detection_capability_is_honest() -> None:
@@ -172,6 +195,13 @@ def test_species_page_has_search_filters_detail_and_back() -> None:
         "Animal group",
         "View profile",
         "Back to species list",
+        "Overview",
+        "Habitat and distribution",
+        "Diet and behaviour",
+        "Ecological importance",
+        "Conservation",
+        "Interesting facts",
         "Can BlueEye detect this species?",
+        "References",
     ):
         assert marker in _PAGE_SOURCE, f"missing UI element: {marker}"
