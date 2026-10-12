@@ -265,3 +265,46 @@ def test_plot_examples_writes_figures(tmp_path):
     )
     written = plot_examples(evaluation, dataset, tmp_path / "figs", limit=2)
     assert written and all(path.is_file() for path in written)
+
+
+# --------------------------------------------------------------------------- #
+# CLI (scripts/run_evaluation.py) — the honest "pending" behaviour
+# --------------------------------------------------------------------------- #
+def _load_cli():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "run_evaluation_cli",
+        Path(__file__).resolve().parents[1] / "scripts" / "run_evaluation.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_cli_is_pending_without_a_dataset(capsys):
+    cli = _load_cli()
+    assert cli.main([]) == 3  # pending, not an error
+    output = capsys.readouterr().out
+    assert "No labelled dataset" in output
+    assert "PENDING" in output
+
+
+def test_cli_rejects_a_missing_config(tmp_path):
+    cli = _load_cli()
+    assert cli.main(["--data", str(tmp_path / "nope.yaml")]) == 2
+
+
+def test_resolve_data_yaml_finds_config_in_directory(tmp_path):
+    cli = _load_cli()
+    (tmp_path / "data.yaml").write_text("names: [fish]\n", encoding="utf-8")
+    resolved = cli._resolve_data_yaml(str(tmp_path))
+    assert resolved == tmp_path / "data.yaml"
+
+
+def test_resolve_data_yaml_dir_without_config_raises(tmp_path):
+    cli = _load_cli()
+    (tmp_path / "ds").mkdir()
+    with pytest.raises(DatasetError):
+        cli._resolve_data_yaml(str(tmp_path / "ds"))
