@@ -608,23 +608,11 @@ def _discovery_row(entry, registry: dict) -> str:
 def _resolve_input(entry, settings=None, user_id=None) -> Path | None:
     """Locate the original upload referenced by a history entry.
 
-    Entries store the input *basename* (and occasionally a full path), while
-    uploads live under the account's own ``data/input/<user_id>`` folder
-    (or ``data/input`` for CLI runs) and the bundled demo sample under
-    ``assets/images/input_folder`` - all candidates are checked.
+    Thin wrapper over :func:`app.ui.state.resolve_owned_input` so the
+    dashboard and the History page locate the original media identically -
+    and only ever the signed-in account's own files.
     """
-    name = (entry.filename or "").strip()
-    if not name or name == "unknown":
-        return None
-    candidates = [Path(name)]
-    if settings is not None and user_id:
-        candidates.append(settings.input_dir / user_id / Path(name).name)
-    candidates.append(Path(PROJECT_ROOT / "data" / "input") / Path(name).name)
-    candidates.append(PROJECT_ROOT / "assets" / "images" / "input_folder" / Path(name).name)
-    for candidate in candidates:
-        if Path(candidate).is_file():
-            return Path(candidate)
-    return None
+    return state.resolve_owned_input(settings, user_id, entry.filename)
 
 
 @st.cache_data(show_spinner=False)

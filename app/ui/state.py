@@ -20,7 +20,12 @@ from typing import Any
 
 import streamlit as st
 
-from app.config import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, get_settings
+from app.config import (
+    IMAGE_EXTENSIONS,
+    PROJECT_ROOT,
+    VIDEO_EXTENSIONS,
+    get_settings,
+)
 from app.detection.detector import MarineDetector
 from app.detection.model_manager import ModelSpec
 from app.processing.enhancement import EnhancementConfig
@@ -146,10 +151,16 @@ def save_upload(uploaded: Any, settings: Any, kind: str, user_id: str | None = N
             ),
         )
     target.write_bytes(data)
-    if kind == "image":
-        validate_image_file(target)
-    else:
-        validate_video_file(target)
+    try:
+        if kind == "image":
+            validate_image_file(target)
+        else:
+            validate_video_file(target)
+    except ValidationError:
+        # Do not leave an undecodable upload behind: it would only accumulate
+        # in the input directory and never be usable.
+        target.unlink(missing_ok=True)
+        raise
     return target
 
 
@@ -236,6 +247,52 @@ def record_history(
         add_entry(entry, path=history_path(None, user_id=user_id))
     except Exception:  # noqa: BLE001 - history must never break detection
         logger.exception("Could not record detection history")
+
+
+# --------------------------------------------------------------------------- #
+# Media locations
+# --------------------------------------------------------------------------- #
+def resolve_input_path(
+    settings: Any, user_id: str | None, filename: str | None
+) -> Path | None:
+    """Locate the original upload referenced by a history entry's filename.
+
+    History stores the input *basename* (and occasionally a full path), while
+    uploads live under the account's own ``data/input/<user_id>`` folder (or
+    ``data/input`` for CLI runs) and the bundled demo sample under
+    ``assets/images/input_folder`` - all candidates are checked. Returns
+    ``None`` when nothing matches, so callers can degrade gracefully.
+    """
+    name = (filename or "").strip()
+    if not name or name == "unknown":
+        return None
+    candidates = [Path(name)]
+    if settings is not None and user_id:
+        candidates.append(settings.input_dir / user_id / Path(name).name)
+    candidates.append(Path(PROJECT_ROOT / "data" / "input") / Path(name).name)
+    candidates.append(
+        PROJECT_ROOT / "assets" / "images" / "input_folder" / Path(name).name
+    )
+    for candidate in candidates:
+        if Path(candidate).is_file():
+            return Path(candidate)
+    return None
+
+
+def resolve_owned_input(
+    settings: Any, user_id: str | None, filename: str | None
+) -> Path | None:
+    """Like :func:`resolve_input_path`, but only returns files the account owns.
+
+    Rendering or embedding a history entry's original input must never let a
+    tampered history file point at an arbitrary path elsewhere on the disk, so
+    the resolved file is required to sit inside one of the account's scoped
+    directories.
+    """
+    candidate = resolve_input_path(settings, user_id, filename)
+    if candidate is not None and is_owned_path(settings, user_id, candidate):
+        return candidate
+    return None
 
 
 # --------------------------------------------------------------------------- #

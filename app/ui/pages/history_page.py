@@ -1,8 +1,14 @@
 """History page: the persisted list of finished detections.
 
-Entries are read from :mod:`app.utils.history` (``outputs/history/
-detections.json``) - they are real records of runs performed on this
-machine, never seeded or faked.
+Entries are read from :mod:`app.utils.history` (one store per account under
+``outputs/history/users/<user_id>/``) - they are real records of runs
+performed on this machine, never seeded or faked.
+
+Every stored run can be re-opened: its original input and annotated result
+are shown inline (image) or as a playable processed video, alongside the
+real detection summary and downloads. Files that were moved or deleted are
+reported honestly instead of breaking the page, and internal storage paths
+are never rendered.
 
 SPDX-License-Identifier: AGPL-3.0-only
 """
@@ -16,7 +22,15 @@ import streamlit as st
 from app.detection.detector import MarineDetector
 from app.detection.results import display_class_name
 from app.ui import state
-from app.ui.components import badge, download_button, empty_state, hero, metrics_row, notice
+from app.ui.components import (
+    badge,
+    download_button,
+    empty_state,
+    hero,
+    kv,
+    metrics_row,
+    notice,
+)
 from app.utils.history import clear_history, history_path, load_entries
 
 
@@ -45,8 +59,8 @@ def render(detector: MarineDetector, settings, user=None) -> None:
             st,
             "info",
             "Your history",
-            f"History is stored per account at {store} and survives "
-            "restarts. It is never sent anywhere.",
+            "Finished detections are stored privately under your account and "
+            "survive restarts. They are never sent anywhere.",
         )
         return
 
@@ -70,7 +84,7 @@ def render(detector: MarineDetector, settings, user=None) -> None:
 # Sections
 # --------------------------------------------------------------------------- #
 def _history_table(entries, settings=None, user_id=None) -> None:
-    """Table of stored runs."""
+    """Table of stored runs plus an inline viewer for any selected run."""
     rows = []
     for index, entry in enumerate(entries, start=1):
         rows.append(
@@ -89,39 +103,69 @@ def _history_table(entries, settings=None, user_id=None) -> None:
                     else f"{entry.confidence_threshold:.2f}"
                 ),
                 "Enhanced": "yes" if entry.enhanced else "no",
-                "Output": Path(entry.output).name if entry.output else "—",
             }
         )
     st.dataframe(rows, hide_index=True, width="stretch")
 
-    with st.expander("Show the newest run in detail", expanded=False):
-        _entry_detail(entries[0], settings, user_id)
+    st.markdown("### Open a stored run")
+    labels = [
+        f"#{index} · {entry.display_time} · {Path(entry.filename).name}"
+        for index, entry in enumerate(entries, start=1)
+    ]
+    selected = st.selectbox(
+        "Stored run",
+        options=list(range(len(entries))),
+        format_func=lambda index: labels[index],
+        key="history_select",
+        label_visibility="collapsed",
+    )
+    st.write("")
+    _entry_detail(entries[selected], settings, user_id)
 
 
 def _entry_detail(entry, settings=None, user_id=None) -> None:
-    """Detail block for one entry (class breakdown + report download).
+    """Full detail for one stored run, with inline media when available.
 
-    Downloads are only offered for files that belong to the signed-in
-    account's own scoped directories; anything else is reported as available
-    (never exposed) without revealing where it actually lives.
+    Downloads and inline media are only offered for files that belong to the
+    signed-in account's own scoped directories; anything else is reported as
+    unavailable without revealing where it actually lives.
     """
-    st.markdown(f"**{Path(entry.filename).name}** · {entry.display_time}")
-    body = (
-        "<dl class='be-kv'>"
-        f"<dt>Type</dt><dd>{entry.kind.capitalize()}</dd>"
-        f"<dt>Model(s)</dt><dd>{', '.join(entry.models) or '—'}</dd>"
-        f"<dt>Objects</dt><dd>{entry.total_detections}</dd>"
-        f"<dt>Species</dt><dd>{entry.unique_classes}</dd>"
-        f"<dt>Average confidence</dt><dd>{entry.average_confidence * 100:.1f}%</dd>"
-        f"<dt>Max confidence</dt><dd>{entry.max_confidence * 100:.1f}%</dd>"
-        f"<dt>Frames processed</dt><dd>{entry.frames_processed or '—'}</dd>"
-        f"<dt>Elapsed</dt><dd>{f'{entry.elapsed_seconds:.1f} s' if entry.elapsed_seconds else '—'}</dd>"
-        f"<dt>Output</dt><dd>{Path(entry.output).name if entry.output else '—'}</dd>"
-        "</dl>"
+    st.markdown(f"#### {Path(entry.filename).name}")
+    st.caption(f"{entry.kind.capitalize()} · {entry.display_time}")
+
+    output = Path(entry.output) if entry.output else None
+    output_ok = (
+        output is not None
+        and state.is_owned_path(settings, user_id, output)
+        and output.is_file()
     )
-    st.markdown(body, unsafe_allow_html=True)
+    original = state.resolve_owned_input(settings, user_id, entry.filename)
+
+    if entry.kind == "video":
+        _video_media(output if output_ok else None, original)
+    else:
+        _image_media(output if output_ok else None, original)
+
+    metrics_row(
+        st,
+        [
+            ("Total objects", entry.total_detections, "above threshold"),
+            ("Species", entry.unique_classes, "distinct classes"),
+            (
+                "Average confidence",
+                f"{entry.average_confidence * 100:.1f}%",
+                "across detections",
+            ),
+            (
+                "Max confidence",
+                f"{entry.max_confidence * 100:.1f}%",
+                "best match",
+            ),
+        ],
+    )
 
     if entry.detections_per_class:
+        st.markdown("**Detected classes**")
         st.markdown(
             "  ".join(
                 badge(f"{display_class_name(name)} · {count}", "info")
@@ -130,25 +174,107 @@ def _entry_detail(entry, settings=None, user_id=None) -> None:
             unsafe_allow_html=True,
         )
 
-    report_owned = bool(entry.report) and state.is_owned_path(settings, user_id, entry.report)
-    output_owned = bool(entry.output) and state.is_owned_path(settings, user_id, entry.output)
-    if report_owned and Path(entry.report).exists():
-        download_button(st, "Download JSON report", entry.report, "application/json")
-    elif entry.report:
-        st.caption("JSON report is not available for download.")
-    if output_owned and Path(entry.output).exists():
-        suffix = Path(entry.output).suffix.lower()
-        mime = "video/mp4" if suffix in {".mp4", ".mov", ".mkv", ".avi"} else "image/jpeg"
-        download_button(st, "Download output file", entry.output, mime)
-    elif entry.output:
-        st.caption("Output file is not available for download.")
+    rows = [
+        ("Type", entry.kind.capitalize()),
+        ("Model(s)", ", ".join(entry.models) or "—"),
+        (
+            "Confidence threshold",
+            "model default"
+            if entry.confidence_threshold is None
+            else f"{entry.confidence_threshold:.2f}",
+        ),
+        ("Enhanced", "yes" if entry.enhanced else "no"),
+        (
+            "Frames processed",
+            entry.frames_processed if entry.frames_processed is not None else "",
+        ),
+        (
+            "Elapsed",
+            f"{entry.elapsed_seconds:.1f} s" if entry.elapsed_seconds else "",
+        ),
+    ]
+    details = kv(rows)
+    if details:
+        st.markdown(details, unsafe_allow_html=True)
+
+    st.write("")
+    download_left, download_right = st.columns(2)
+    with download_left:
+        if output_ok:
+            suffix = output.suffix.lower()
+            mime = "video/mp4" if suffix in {".mp4", ".mov", ".mkv", ".avi"} else "image/jpeg"
+            download_button(st, "Download output file", output, mime)
+        elif entry.output:
+            st.caption("The output file is no longer available on this device.")
+    with download_right:
+        report_ok = (
+            bool(entry.report)
+            and state.is_owned_path(settings, user_id, entry.report)
+            and Path(entry.report).is_file()
+        )
+        if report_ok:
+            download_button(st, "Download JSON report", entry.report, "application/json")
+        elif entry.report:
+            st.caption("The JSON report is no longer available on this device.")
+
+
+def _image_media(output: Path | None, original: Path | None) -> None:
+    """Original input beside the annotated result (either side may be missing)."""
+    left, right = st.columns(2)
+    with left:
+        st.markdown("**Original image**")
+        if original is not None:
+            _show_image(original)
+        else:
+            st.caption("The original image is no longer available on this device.")
+    with right:
+        st.markdown("**Detection result**")
+        if output is not None:
+            _show_image(output)
+        else:
+            st.caption("The annotated result is no longer available on this device.")
+
+
+def _video_media(output: Path | None, original: Path | None) -> None:
+    """Processed video (and the original, if still present)."""
+    left, right = st.columns(2)
+    with left:
+        st.markdown("**Original video**")
+        if original is not None:
+            _show_video(original)
+        else:
+            st.caption("The original video is no longer available on this device.")
+    with right:
+        st.markdown("**Processed video**")
+        if output is not None:
+            _show_video(output)
+        else:
+            st.caption("The processed video is no longer available on this device.")
+
+
+def _show_image(path: Path) -> None:
+    """Render an image, tolerating a file that vanished between checks."""
+    try:
+        st.image(path.read_bytes(), width="stretch")
+    except OSError:
+        st.caption("That image could not be read from disk.")
+
+
+def _show_video(path: Path) -> None:
+    """Render a video, tolerating a file that vanished between checks."""
+    try:
+        st.video(path.read_bytes())
+    except OSError:
+        st.caption("That video could not be read from disk.")
 
 
 def _actions(store: Path) -> None:
     """Export and clear actions."""
+    entry_count = len(load_entries(store))
     left, right = st.columns(2)
     with left:
-        download_button(st, "Export history (JSON)", store, "application/json")
+        if entry_count:
+            download_button(st, "Export history (JSON)", store, "application/json")
     with right:
         if st.button(
             "Clear history",
@@ -158,7 +284,10 @@ def _actions(store: Path) -> None:
             clear_history(store)
             st.rerun()
 
-    st.caption(f"Stored at {store}")
+    st.caption(
+        "History is kept privately under your account; it is never uploaded "
+        "or shared."
+    )
 
 
 __all__ = ["render"]
