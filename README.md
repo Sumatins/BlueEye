@@ -494,6 +494,32 @@ python scripts/evaluate.py \
 > BlueEye is fabricated. The Models page shows an *Evaluation* row **only**
 > when a registry entry records real metrics.
 
+### Evaluation pipeline (reproducible model comparison)
+
+`scripts/evaluate.py` is a thin wrapper over Ultralytics' own `val()`. For the
+**reproducible comparison** of multiple models on a labelled dataset use
+`scripts/run_evaluation.py`, which:
+
+- checks dataset ↔ model **class compatibility** and reports unsupported
+  classes instead of silently remapping them;
+- computes precision, recall, mAP@0.5 and mAP@0.5:0.95 **per class** with a
+  dependency-light NumPy implementation (`app/evaluation/`);
+- records inference time and the full **test conditions** (device, package
+  versions);
+- writes `results.json`, `metrics.csv`, `per_class.csv` and `summary.md` to
+  `outputs/evaluation/<timestamp>/`.
+
+```bash
+python scripts/run_evaluation.py --list-models
+python scripts/run_evaluation.py --data data/raw/my_dataset/data.yaml \
+    --split test --model all --plots
+```
+
+With no labelled dataset the script prints the setup guide and exits with
+code 3 — the experiment is **pending** and **no score is invented**. See
+[`docs/evaluation.md`](docs/evaluation.md) for dataset sources and licences,
+compatibility rules, metric definitions and limitations.
+
 ## Dataset Format
 
 See [`data/README.md`](data/README.md) for the expected YOLO layout,
@@ -627,6 +653,10 @@ pytest --cov=app       # with coverage
   validation, path containment, fail-safe behaviour), the dataset-preparation
   helper (`scripts/prepare_dataset.py`, including its refusal of unlabelled
   data) and the redesigned navigation / model-card metadata.
+- **Evaluation-pipeline tests** — the metric maths (IoU, AP, mAP@0.5:0.95),
+  class-compatibility checks, YOLO dataset/label reading, `limit_split` and the
+  JSON/CSV/Markdown report writers (`tests/test_evaluation.py`), all on
+  synthetic data with a stub predictor — no weights and no network.
 - **Authentication tests** — the account backend against a real SQLite
   database and real bcrypt (`tests/test_auth_service.py`), the Streamlit UI
   driven end to end with `streamlit.testing.v1.AppTest`
@@ -672,6 +702,13 @@ blueeye/
 │   │   ├── detector.py             # MarineDetector (inference API)
 │   │   ├── model_manager.py        # registry, download, cached loading, device
 │   │   └── results.py              # Detection, stats, JSON reports
+│   ├── evaluation/                 # reproducible evaluation (research pipeline)
+│   │   ├── metrics.py              # IoU, AP, mAP@0.5 / mAP@0.5:0.95
+│   │   ├── datasets.py             # YOLO data.yaml + label reading
+│   │   ├── compat.py               # dataset <-> model class compatibility
+│   │   ├── runner.py               # run detectors unchanged + timing
+│   │   ├── report.py               # JSON / CSV / Markdown writers
+│   │   └── plots.py                # optional matplotlib figures
 │   ├── auth/                       # local accounts: bcrypt, SQLite, sessions
 │   │   ├── security.py             # hashing, token generation, validation
 │   │   ├── store.py                # users + sessions SQLite persistence
@@ -699,13 +736,16 @@ blueeye/
 │   ├── fetch_additional_models.py  # fetch the additional verified models (SHA-256 pinned)
 │   ├── prepare_dataset.py          # validate + lay out a downloaded dataset
 │   ├── train.py                    # training / fine-tuning
-│   └── evaluate.py                 # precision / recall / mAP evaluation
+│   ├── evaluate.py                 # precision / recall / mAP (Ultralytics val)
+│   └── run_evaluation.py           # reproducible multi-model comparison + reports
 ├── training/
 │   ├── README.md                   # per-target training workflow
 │   └── datasets/                   # YOLO data.yaml configs (Indian species)
 ├── docs/
 │   ├── regional_models.md          # regional model research + training workflow
-│   └── indian_biodiversity.md      # Indian-species datasets, licences, plan
+│   ├── indian_biodiversity.md      # Indian-species datasets, licences, plan
+│   ├── evaluation.md               # evaluation pipeline, datasets, licences, limits
+│   └── competition_demo.md         # demonstration workflow + fallbacks
 ├── models/                         # weights (downloaded, git-ignored)
 │   ├── fish_inv/FishInv.pt
 │   ├── megafauna/MegaFauna.pt
@@ -717,6 +757,7 @@ blueeye/
 │   ├── videos/                     # annotated videos (per-account subdirs)
 │   ├── reports/                    # JSON reports (per-account subdirs)
 │   ├── history/                    # persisted detection history (per account)
+│   ├── evaluation/                 # evaluation runs (results.json, CSVs, summary)
 │   └── auth/blueeye_auth.db        # accounts + sessions (git-ignored)
 ├── assets/                         # sample media from marine-detect
 ├── tests/                          # pytest suite (unit + integration)
@@ -725,7 +766,8 @@ blueeye/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
-└── README.md
+├── README.md
+└── PAPER.md                        # research-paper draft (results marked PENDING)
 ```
 
 ## Limitations
@@ -745,7 +787,10 @@ blueeye/
   depending on hardware); GPU is recommended for longer footage.
 - Underwater enhancement is a heuristic preprocessing step and is **not**
   evaluated here — it may help or hurt depending on the scene.
-- mAP/precision/recall metrics require a labelled dataset; none are bundled.
+- mAP/precision/recall metrics require a labelled dataset; none are bundled, so
+  the reproducible evaluation pipeline (`scripts/run_evaluation.py`,
+  [`docs/evaluation.md`](docs/evaluation.md)) is **pending** until one is
+  provided. It never invents a score.
 - The web UI stores uploads on the local disk (`data/input/`) and is designed
   for **local/trusted use**, not for public internet exposure.
 - Authentication is a local, single-database implementation: there is **no
@@ -773,8 +818,15 @@ documentation are ready (`docs/regional_models.md`,
 [`docs/indian_biodiversity.md`](docs/indian_biodiversity.md),
 `models/custom/README.md`, [`training/`](training/README.md)). The missing
 piece is real regional data — collect and label it, train with
-`scripts/train.py`, evaluate with `scripts/evaluate.py`, then register the
-weights. No regional / Indian model is shipped or claimed before that happens.
+`scripts/train.py`, evaluate with `scripts/evaluate.py` or the comparison
+pipeline `scripts/run_evaluation.py`, then register the weights. No regional /
+Indian model is shipped or claimed before that happens.
+
+**Research evaluation:** the reproducible comparison pipeline
+(`app/evaluation/`, `scripts/run_evaluation.py`) and the paper draft
+([`PAPER.md`](PAPER.md)) are in place. The next step is a licensed,
+labelled Indian-region test set so the PENDING experiment can be run; see
+[`docs/evaluation.md`](docs/evaluation.md) for the dataset short-list.
 
 ## Credits & License
 
