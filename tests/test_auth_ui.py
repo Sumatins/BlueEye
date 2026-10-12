@@ -88,7 +88,7 @@ def test_every_private_page_gates_anonymous_visitors(app_env, page: str) -> None
     assert "be_auth_token" not in at.session_state
 
 
-@pytest.mark.parametrize("page", ["species", "map", "models", "about", "help"])
+@pytest.mark.parametrize("page", ["species", "models", "about", "help"])
 def test_public_pages_stay_browsable_for_guests(app_env, page: str) -> None:
     at = _app(page).run()
     assert not at.exception, at.exception
@@ -353,6 +353,21 @@ def test_account_page_renders_for_a_signed_in_user(app_env) -> None:
     _by_key(at.text_input, "acct_name")
 
 
+def test_account_page_hides_internal_implementation_details(app_env) -> None:
+    """The Account page never exposes storage paths, ids or hashes."""
+    at = _goto_account(_register(_app("dashboard"), "Ada", "ada@example.org", "secreT123"))
+    assert not at.exception, at.exception
+    parts = [m.value for m in at.markdown]
+    parts += [c.value for c in getattr(at, "caption", [])]
+    blob = "\n".join(parts)
+    assert "blueeye_auth.db" not in blob
+    assert "Account id" not in blob
+    assert str(app_env) not in blob
+    assert "$2" not in blob  # no bcrypt hashes
+    # The professional identity banner is shown instead.
+    assert "be-identity" in blob
+
+
 def test_account_page_profile_update_persists(app_env) -> None:
     at = _goto_account(_register(_app("dashboard"), "Ada", "ada@example.org", "secreT123"))
     _by_key(at.text_input, "acct_name").set_value("Ada Byron")
@@ -400,4 +415,23 @@ def test_sign_out_everywhere_else_keeps_this_device(app_env) -> None:
     # The current device remains signed in and its token is still valid.
     assert at.session_state["be_auth_token"] == token
     assert AuthService(settings=_settings_for(app_env)).authenticate(token) is not None
+
+
+# --------------------------------------------------------------------------- #
+# Navigation (every remaining sidebar section)
+# --------------------------------------------------------------------------- #
+def test_every_sidebar_section_renders_for_a_signed_in_user(app_env) -> None:
+    """Every remaining navigation entry renders without error, and the
+    removed Map entry is not offered anywhere."""
+    from app.ui.theme import PAGES
+
+    at = _register(_app("dashboard"), "Ada", "ada@example.org", "secreT123")
+    for page_id, _label, _icon in PAGES:
+        _by_key(at.radio, "nav_sel").set_value(page_id)
+        at.run()
+        assert not at.exception, f"{page_id}: {at.exception}"
+
+    offered = set(_by_key(at.radio, "nav_sel").options)
+    assert "Map" not in offered
+    assert offered == {label for _, label, _ in PAGES}
 

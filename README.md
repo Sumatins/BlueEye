@@ -406,7 +406,7 @@ server-verified session — nothing is trusted from the browser.
   local state. If server-side revocation genuinely fails, the UI says so
   instead of claiming success.
 - **Protected routes** — Dashboard, AI Detection, Detection History, Analytics
-  and Account require a signed-in user. Species Explorer, Map, AI Models, About
+  and Account require a signed-in user. Species Explorer, AI Models, About
   and Help stay public (with a sign-in prompt).
 - **Per-account data** — detection history, uploads, annotated outputs and JSON
   reports are stored under per-account directories

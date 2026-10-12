@@ -66,6 +66,9 @@ COOKIE_NAME = "blueeye_session"
 #: so the cookie-writing script is not re-emitted on every rerun.
 _COOKIE_SYNC_KEY = "be_auth_cookie_synced"
 
+#: One-shot account-page notice (kind, message) shown after the next rerun.
+_FLASH_KEY = "be_account_flash"
+
 #: Private workspace pages: anonymous visitors see the sign-in gate here.
 #: Species / map / models / about / help stay public.
 PRIVATE_PAGES = frozenset({"dashboard", "detect", "history", "analytics", "account"})
@@ -403,62 +406,83 @@ def render_account(settings: Any, user: User | None) -> None:
         icon="account_circle",
     )
     _consume_revocation_warning()
+    _consume_flash()
 
-    _profile_section(settings, user)
+    _profile_section(user)
     _password_section(settings, user)
     _sessions_section(user)
 
 
-def _profile_section(settings: Any, user: User) -> None:
-    """Identity summary + rename form."""
-    section_title(st, "Profile")
-    columns = st.columns(3)
-    for column, title, value in (
-        (columns[0], "Full name", user.full_name),
-        (columns[1], "Email", user.email),
-        (columns[2], "Member since", _fmt_ts(user.created_at)),
-    ):
-        column.markdown(
-            f'<div class="be-card"><div class="be-card-title">{esc(title)}</div>'
-            f'<p class="be-value">{esc(value)}</p></div>',
-            unsafe_allow_html=True,
-        )
-    st.caption(f"Account id: {user.id} · data stored in `{settings.auth_db_path}`")
+def _profile_section(user: User) -> None:
+    """Identity overview + profile edit form.
+
+    Only user-facing account fields are shown. Internal implementation
+    details (database paths, account ids, hashes, tokens) are never rendered.
+    """
+    section_title(st, "Profile", "The details stored with your account.")
+    st.markdown(_identity_html(user), unsafe_allow_html=True)
+    st.markdown(
+        '<div class="be-infogrid">'
+        + _info_card("badge", "Account status", badge("Active", "ok", dot=True))
+        + _info_card("calendar_month", "Member since", esc(_fmt_date(user.created_at)))
+        + _info_card("login", "Last sign-in", esc(_fmt_ts(user.last_login_at)))
+        + "</div>",
+        unsafe_allow_html=True,
+    )
 
     with st.container(border=True):
-        name_input = st.text_input("Full name", value=user.full_name, key="acct_name")
-        if st.button("Save profile", key="acct_save_name"):
+        section_title(st, "Edit profile")
+        st.caption(
+            "Update the name shown across BlueEye. Your email address "
+            "identifies your account and cannot be changed here."
+        )
+        name_input = st.text_input(
+            "Full name",
+            value=user.full_name,
+            key="acct_name",
+            max_chars=120,
+        )
+        if st.button("Save changes", key="acct_save_name", icon=":material/save:"):
             try:
-                updated = _service().update_profile(user.id, name_input)
+                _service().update_profile(user.id, name_input)
             except AuthValidationError as exc:
                 st.error(str(exc))
             except Exception:  # noqa: BLE001
                 logger.exception("Profile update failed")
-                st.error("Could not update the profile. Please try again.")
+                st.error("Could not update your profile right now. Please try again.")
             else:
-                st.session_state[USER_NAME_KEY] = updated.full_name
-                st.success("Profile updated.")
+                _flash("success", "Your profile has been updated.")
+                st.rerun()
 
 
 def _password_section(settings: Any, user: User) -> None:
-    """Change-password form (keeps this device signed in)."""
-    section_title(st, "Change password")
+    """Change-password form.
+
+    The current password is verified server-side and the new one is validated
+    and bcrypt-hashed before it is stored; on success the account's *other*
+    devices are signed out. This device stays signed in.
+    """
+    section_title(st, "Password", "Change the password you sign in with.")
     with st.container(border=True):
-        columns = st.columns(3)
-        current_pw = columns[0].text_input(
+        current_pw = st.text_input(
             "Current password", type="password", key="acct_pw_current"
         )
-        new_pw = columns[1].text_input(
+        new_pw = st.text_input(
             "New password",
             type="password",
             key="acct_pw_new",
             help=f"At least {settings.password_min_length} characters with "
             "a letter and a number.",
         )
-        confirm_pw = columns[2].text_input(
+        confirm_pw = st.text_input(
             "Confirm new password", type="password", key="acct_pw_confirm"
         )
-        if st.button("Change password", key="acct_pw_change"):
+        st.caption(
+            f"Minimum {settings.password_min_length} characters, including at "
+            "least one letter and one number. Changing your password signs out "
+            "every other device."
+        )
+        if st.button("Change password", key="acct_pw_change", icon=":material/key:"):
             try:
                 _service().change_password(
                     user.id,
@@ -471,49 +495,75 @@ def _password_section(settings: Any, user: User) -> None:
                 st.error(str(exc))
             except Exception:  # noqa: BLE001
                 logger.exception("Password change failed")
-                st.error("Could not change the password. Please try again.")
+                st.error("Could not change your password right now. Please try again.")
             else:
-                st.success("Password changed. Any other devices were signed out.")
+                _flash(
+                    "success",
+                    "Your password was changed. Other devices were signed out.",
+                )
+                st.rerun()
 
 
 def _sessions_section(user: User) -> None:
-    """List the account's sessions; allow revoking any other device."""
-    section_title(st, "Active sessions")
-    service = _service()
-    sessions = service.list_sessions(user.id, current_digest=_current_digest())
-    if not sessions:
-        st.caption("No stored sessions.")
-    for session in sessions:
-        columns = st.columns([2, 2, 2, 1, 1])
-        label = "This device" if session["current"] else "Session"
-        columns[0].markdown(f"<strong>{esc(label)}</strong>", unsafe_allow_html=True)
-        columns[1].caption(f"Started {_fmt_ts(session['created_at'])}")
-        columns[2].caption(f"Expires {_fmt_ts(session['expires_at'])}")
-        columns[3].markdown(
-            badge(
-                "Active" if session["active"] else "Revoked",
-                "ok" if session["active"] else "off",
-                dot=True,
-            ),
-            unsafe_allow_html=True,
-        )
-        if session["current"]:
-            columns[4].caption("·")
-        elif columns[4].button(
-            "Sign out", key=f"acct_revoke_{session['id']}", width="stretch"
-        ) and service.revoke_session_for_user(user.id, session["id"]):
-            st.success("That session has been revoked.")
-            st.rerun()
+    """List the account's sessions; allow revoking any other device.
 
-    if st.button("Sign out everywhere else", key="acct_revoke_all"):
+    Revocation is a real server-side update; the button only reports success
+    when the store actually revoked the row.
+    """
+    section_title(st, "Active sessions", "Devices currently signed in to your account.")
+    service = _service()
+    current = _current_digest()
+    sessions = service.list_sessions(user.id, current_digest=current)
+
+    with st.container(border=True):
+        if not sessions:
+            st.caption("No active sessions were found.")
+        for session in sessions:
+            columns = st.columns([2, 3, 3, 1.4, 1.2], vertical_alignment="center")
+            if session["current"]:
+                columns[0].markdown(
+                    badge("This device", "ok", dot=True), unsafe_allow_html=True
+                )
+            else:
+                columns[0].markdown(
+                    f'{span("devices")} Other device', unsafe_allow_html=True
+                )
+            columns[1].caption(f"Signed in {_fmt_ts(session['created_at'])}")
+            columns[2].caption(f"Expires {_fmt_ts(session['expires_at'])}")
+            columns[3].markdown(
+                badge(
+                    "Active" if session["active"] else "Revoked",
+                    "ok" if session["active"] else "off",
+                ),
+                unsafe_allow_html=True,
+            )
+            if session["current"]:
+                columns[4].caption("—")
+            elif columns[4].button(
+                "Revoke", key=f"acct_revoke_{session['id']}", width="stretch"
+            ):
+                if service.revoke_session_for_user(user.id, session["id"]):
+                    _flash("success", "That session has been revoked.")
+                    st.rerun()
+                else:
+                    st.error("That session could not be revoked.")
+
+    if st.button(
+        "Sign out everywhere else", key="acct_revoke_all", icon=":material/logout:"
+    ):
         try:
-            count = service.revoke_other_sessions(user.id, keep_digest=_current_digest())
+            count = service.revoke_other_sessions(user.id, keep_digest=current)
         except Exception:  # noqa: BLE001
             logger.exception("Bulk session revocation failed")
-            st.error("Could not revoke the sessions. Please try again.")
+            st.error("Could not revoke the other sessions. Please try again.")
         else:
             state.clear_user_state()
-            st.success(f"Signed out {count} other device(s).")
+            message = (
+                f"Signed out {count} other device(s)."
+                if count
+                else "No other devices were signed in."
+            )
+            _flash("success" if count else "info", message)
             st.rerun()
 
 
@@ -530,3 +580,57 @@ def _fmt_ts(iso: str | None) -> str:
         return datetime.fromisoformat(iso).strftime("%d %b %Y, %H:%M")
     except (ValueError, TypeError):
         return iso or "—"
+
+
+def _fmt_date(iso: str | None) -> str:
+    """Calendar date only (``08 Oct 2026``); raw if odd."""
+    if not iso:
+        return "—"
+    try:
+        return datetime.fromisoformat(iso).strftime("%d %b %Y")
+    except (ValueError, TypeError):
+        return iso or "—"
+
+
+def _identity_html(user: User) -> str:
+    """Identity banner for the account page (name, email, status)."""
+    return (
+        '<div class="be-identity">'
+        f'<div class="avatar">{span("account_circle")}</div>'
+        '<div class="who">'
+        f"<h4>{esc(user.full_name)}</h4>"
+        f"<p>{esc(user.email)}</p>"
+        "</div>"
+        f'<div class="state">{badge("Active", "ok", dot=True)}</div>'
+        "</div>"
+    )
+
+
+def _info_card(icon: str, label: str, value_html: str) -> str:
+    """One aligned account-summary card (``value_html`` is trusted HTML)."""
+    return (
+        '<div class="be-card">'
+        f'<div class="be-card-title">{span(icon)}{esc(label)}</div>'
+        f'<p class="be-value">{value_html}</p></div>'
+    )
+
+
+def _flash(kind: str, message: str) -> None:
+    """Queue a one-shot account notice to display after the next rerun."""
+    st.session_state[_FLASH_KEY] = (kind, message)
+
+
+def _consume_flash() -> None:
+    """Show and clear any queued account-page notice."""
+    data = st.session_state.pop(_FLASH_KEY, None)
+    if not data:
+        return
+    kind, message = data
+    if kind == "success":
+        st.success(message)
+    elif kind == "error":
+        st.error(message)
+    elif kind == "warning":
+        st.warning(message)
+    else:
+        st.info(message)

@@ -16,7 +16,6 @@ imageio-ffmpeg>=0.4.9   # bundled ffmpeg -> H.264 annotated videos (browser-play
 
 # Web UI
 streamlit>=1.49       # width="stretch" replaces the removed use_container_width
-pydeck>=0.9           # deck.gl rendering for the interactive Marine Areas Map
 
 # Authentication (local accounts, bcrypt password hashing)
 bcrypt>=4.0

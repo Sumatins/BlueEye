@@ -34,7 +34,6 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("detect", "AI Detection", "center_focus_strong"),
     ("history", "Detection History", "history"),
     ("species", "Species Explorer", "menu_book"),
-    ("map", "Map", "map"),
     ("models", "AI Models", "psychology"),
     ("analytics", "Analytics", "bar_chart"),
     ("about", "About BlueEye", "info"),
@@ -46,7 +45,7 @@ PAGES: tuple[tuple[str, str, str], ...] = (
 #: The ids must match :data:`PAGES`; section headers are rendered by CSS.
 NAV_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Main", ("dashboard", "detect")),
-    ("Explore", ("history", "species", "map", "models", "analytics")),
+    ("Explore", ("history", "species", "models", "analytics")),
     ("Information", ("about", "help")),
     ("Account", ("account",)),
 )
@@ -956,66 +955,6 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 }
 
 /* ------------------------------------------------------------------ */
-/* Marine Areas Map                                                     */
-/* ------------------------------------------------------------------ */
-/* Species result grid (scoped to the Map page). */
-.be-mapgrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: .7rem;
-  margin-bottom: .95rem;
-}
-.be-map-species {
-  display: flex; flex-direction: column; gap: .45rem;
-  background: var(--be-surface);
-  border: 1px solid var(--be-border);
-  border-radius: var(--be-radius-sm);
-  box-shadow: var(--be-shadow);
-  padding: .9rem 1rem;
-  height: 100%;
-}
-.be-map-species .head { display: flex; align-items: center; gap: .65rem; }
-.be-map-species .head .ic {
-  flex: none; width: 44px; height: 44px; border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, rgba(11, 58, 102, .7), rgba(8, 145, 178, .35));
-  border: 1px solid rgba(34, 211, 238, .22);
-}
-.be-map-species .head .ic .be-ic { color: #7dd3fc; font-size: 1.4rem; }
-/* The text block must be allowed to shrink so long common/scientific names
-   wrap inside the card instead of overflowing next to the icon. */
-.be-map-species .head > div:not(.ic) { min-width: 0; flex: 1 1 auto; }
-.be-map-species h4 { margin: 0; font-size: .98rem; color: var(--be-text); overflow-wrap: anywhere; }
-.be-map-species .sci { color: var(--be-muted); font-size: .8rem; font-style: italic; margin: 0; overflow-wrap: anywhere; }
-.be-map-species .tags { display: flex; flex-wrap: wrap; gap: .35rem; }
-.be-map-species .about { color: var(--be-muted); font-size: .82rem; line-height: 1.5; margin: 0; }
-.be-map-species .foot {
-  margin-top: auto; padding-top: .35rem;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: .4rem; flex-wrap: wrap;
-}
-.be-map-species .foot .loc {
-  color: var(--be-muted); font-size: .76rem;
-  display: inline-flex; align-items: center; gap: .25rem; min-width: 0;
-  overflow-wrap: anywhere;
-}
-.be-map-species .foot .loc .be-ic { color: #67e8f9; font-size: 1rem; }
-
-/* Selected-location panel beside the map. */
-.be-map-area h4 { margin: .3rem 0 .15rem; font-size: 1.06rem; color: var(--be-text); }
-.be-map-area .tags { margin-bottom: .35rem; }
-.be-map-area .note { color: var(--be-muted); font-size: .84rem; line-height: 1.5; margin: 0 0 .5rem; }
-.be-map-legend { margin-top: .6rem; border-top: 1px dashed var(--be-border); padding-top: .5rem; }
-.be-map-legend .row {
-  display: flex; align-items: center; gap: .4rem;
-  margin: .28rem 0; color: var(--be-muted); font-size: .78rem;
-}
-
-/* OBIS source / attribution note. */
-.be-obs-src { margin-top: .35rem; }
-.be-obs-src p { color: var(--be-muted); font-size: .76rem; line-height: 1.5; margin: .3rem 0 0; }
-
-/* ------------------------------------------------------------------ */
 /* Authentication gate + account page                                  */
 /* ------------------------------------------------------------------ */
 .be-auth { text-align: center; margin: 2.2rem 0 .6rem; }
@@ -1045,6 +984,31 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 .be-side-acct-head .n { margin: 0; color: var(--be-text); font-weight: 600; font-size: .9rem; overflow-wrap: anywhere; }
 .be-side-acct-head .e { margin: 0; color: var(--be-muted); font-size: .76rem; overflow-wrap: anywhere; }
 
+/* Account page identity banner + aligned summary cards. */
+.be-identity {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  background: var(--be-surface); border: 1px solid var(--be-border);
+  border-radius: var(--be-radius); box-shadow: var(--be-shadow);
+  padding: 1.1rem 1.25rem; margin-bottom: .8rem;
+}
+.be-identity .avatar {
+  flex: none; width: 58px; height: 58px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #0b3a66, #0891b2);
+  border: 1px solid rgba(34, 211, 238, .35);
+}
+.be-identity .avatar .be-ic { font-size: 2rem; color: #cffafe; }
+.be-identity .who { min-width: 0; flex: 1 1 auto; }
+.be-identity .who h4 { margin: 0; font-size: 1.18rem; color: var(--be-text); overflow-wrap: anywhere; }
+.be-identity .who p { margin: .12rem 0 0; color: var(--be-muted); font-size: .9rem; overflow-wrap: anywhere; }
+.be-identity .state { flex: none; }
+.be-infogrid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem;
+  margin-bottom: .8rem;
+}
+.be-infogrid .be-card { height: 100%; margin-bottom: 0; }
+.be-infogrid .be-card .be-value { margin-top: .1rem; }
+
 /* ------------------------------------------------------------------ */
 /* Responsive                                                           */
 /* ------------------------------------------------------------------ */
@@ -1056,6 +1020,7 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
   }
   .be-cmp .arrow { display: none; }
   .be-mstatgrid, .be-biogrid { grid-template-columns: repeat(2, 1fr); }
+  .be-infogrid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 900px) {
@@ -1090,7 +1055,7 @@ section[data-testid="stSidebar"] label[data-testid="stRadioOption"]::after {
 }
 
 @media (max-width: 640px) {
-  .be-mstatgrid, .be-biogrid, .be-mapgrid { grid-template-columns: 1fr; }
+  .be-mstatgrid, .be-biogrid, .be-infogrid { grid-template-columns: 1fr; }
 }
 </style>
 """

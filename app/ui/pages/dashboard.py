@@ -391,7 +391,7 @@ def _featured_html(species: Species) -> str:
     status = species.conservation_status or "Not assessed"
     return (
         '<div class="be-bio-featured">'
-        f'<div class="photo">{span("turtle")}</div><div>'
+        f'<div class="photo">{span(_MINI_ICONS.get(species.id, "water_drop"))}</div><div>'
         f"<h4>{esc(species.common_name)}</h4>"
         f'<p class="sci">{esc(species.scientific_name)}</p>'
         '<div class="badges">'
@@ -424,8 +424,9 @@ def _mini_html(species: Species) -> str:
 
 #: Decorative icon per mini species (Material Symbols names).
 _MINI_ICONS = {
+    "green_sea_turtle": "water_drop",
     "olive_ridley_turtle": "water_drop",
-    "dugong": "ecosystem",
+    "dugong": "water",
     "whale_shark": "waves",
     "spotted_seahorse": "pets",
 }

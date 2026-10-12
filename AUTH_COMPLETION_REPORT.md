@@ -52,7 +52,7 @@ UI layer:
   state and the cookie. If revocation genuinely fails, the UI says so instead
   of falsely claiming success.
 - **Protected routes** — `dashboard`, `detect`, `history`, `analytics`,
-  `account` require a signed-in user. `species`, `map`, `models`, `about`,
+  `account` require a signed-in user. `species`, `models`, `about`,
   `help` stay public with a guest sign-in prompt. Anonymous visitors land on the
   private dashboard, so the gate is the landing screen.
 - **Per-account data** — history (`outputs/history/users/<user_id>/detections.json`),

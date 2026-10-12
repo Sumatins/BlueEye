@@ -34,7 +34,6 @@ from app.ui.pages import (  # noqa: E402
     detect,
     help_page,
     history_page,
-    map_page,
     models,
     species,
 )
@@ -52,7 +51,6 @@ PAGE_MODULES = {
     "detect_image": detect,
     "detect_video": detect,
     "species": species,
-    "map": map_page,
     "models": models,
     "analytics": analytics,
     "history": history_page,

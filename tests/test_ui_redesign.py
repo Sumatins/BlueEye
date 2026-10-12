@@ -36,7 +36,6 @@ def test_required_navigation_links_are_present() -> None:
         "AI Detection",
         "Detection History",
         "Species Explorer",
-        "Map",
         "AI Models",
         "Analytics",
         "About BlueEye",
@@ -44,12 +43,14 @@ def test_required_navigation_links_are_present() -> None:
     ):
         assert required in labels
     assert labels.count("AI Detection") == 1
+    # The Map section was removed from the navigation entirely.
+    assert "Map" not in labels
 
 
 def test_sidebar_groups_match_the_brief() -> None:
     grouped = {title: ids for title, ids in theme.NAV_GROUPS}
     assert grouped["Main"] == ("dashboard", "detect")
-    assert grouped["Explore"] == ("history", "species", "map", "models", "analytics")
+    assert grouped["Explore"] == ("history", "species", "models", "analytics")
     assert grouped["Information"] == ("about", "help")
 
 
@@ -68,6 +69,24 @@ def test_every_page_has_a_render_module() -> None:
 def test_nav_groups_cover_every_page_exactly_once() -> None:
     grouped = [page_id for _, ids in theme.NAV_GROUPS for page_id in ids]
     assert sorted(grouped) == sorted(page_id for page_id, _, _ in theme.PAGES)
+
+
+def test_map_section_is_removed() -> None:
+    """The Map section is gone from navigation, routing and source code."""
+    page_ids = [page_id for page_id, _, _ in theme.PAGES]
+    assert "map" not in page_ids
+    assert "map" not in PAGE_MODULES
+    grouped = [page_id for _, ids in theme.NAV_GROUPS for page_id in ids]
+    assert "map" not in grouped
+    # No dead map-only code remains on disk.
+    assert not (PROJECT_ROOT / "app" / "ui" / "pages" / "map_page.py").exists()
+    assert not (PROJECT_ROOT / "app" / "content" / "regions.py").exists()
+    # The shell no longer imports or wires the removed page.
+    shell = (PROJECT_ROOT / "app" / "ui" / "streamlit_app.py").read_text(
+        encoding="utf-8"
+    )
+    assert "map_page" not in shell
+    assert '"map"' not in shell
 
 
 def test_sidebar_is_clean_of_status_and_repository_text() -> None:
@@ -198,6 +217,29 @@ def test_dashboard_reads_real_history() -> None:
         assert fabricated not in source
 
 
+def test_dashboard_biodiversity_icons_are_valid_material_symbols() -> None:
+    """No invalid Material Symbols names in the biodiversity cards.
+
+    Names that are not real ligatures (for example ``turtle`` / ``ecosystem``)
+    render as literal words in the icon font and overflow the small cards -
+    exactly the stray oversized text that appeared on the dashboard.
+    """
+    from app.ui.pages import dashboard
+
+    source = (PROJECT_ROOT / "app" / "ui" / "pages" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    assert '"turtle"' not in source
+    assert '"ecosystem"' not in source
+    # Every decorative species icon is a real Material Symbols name.
+    assert set(dashboard._MINI_ICONS.values()) <= {
+        "water_drop",
+        "water",
+        "waves",
+        "pets",
+    }
+
+
 def test_registry_metrics_are_parsed(tmp_path) -> None:
     models_dir = tmp_path / "models"
     custom = models_dir / "custom"
@@ -256,8 +298,8 @@ def test_private_pages_are_gated_and_public_pages_are_open() -> None:
         "analytics",
         "account",
     }
-    # Species / map / models / about / help must remain browsable anonymously.
-    public = {"species", "map", "models", "about", "help"}
+    # Species / models / about / help must remain browsable anonymously.
+    public = {"species", "models", "about", "help"}
     assert public.isdisjoint(auth_ui.PRIVATE_PAGES)
 
 
