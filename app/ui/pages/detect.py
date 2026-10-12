@@ -23,6 +23,7 @@ import streamlit as st
 from app.config import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 from app.detection.detector import MarineDetector
 from app.detection.model_manager import ModelError
+from app.observations.models import ObservationError
 from app.processing.enhancement import EnhancementConfig
 from app.processing.image_processor import ImageProcessor, ProcessingError
 from app.processing.video_processor import VideoProcessor, probe_video
@@ -494,6 +495,16 @@ def _render_image_results(settings=None, user_id: str | None = None) -> None:
         if report_path:
             download_button(st, "Download JSON report", report_path, "application/json")
 
+    _save_section(
+        kind="image",
+        settings=settings,
+        user_id=user_id,
+        report=report,
+        report_path=report_path,
+        original_path=st.session_state.get("image_input"),
+        annotated_path=output_path,
+    )
+
 
 def _summary_metrics(stats: dict) -> None:
     total = stats.get("total_detections", 0)
@@ -647,6 +658,7 @@ def _run_video(
 
     st.session_state["video_output"] = str(result.output_path)
     st.session_state["video_report"] = str(result.report_path) if result.report_path else None
+    st.session_state["video_input"] = str(result.input_path)
     st.session_state["video_stats"] = result.summary_stats()
     st.session_state["video_total_hint"] = total_hint
 
@@ -715,3 +727,117 @@ def _render_video_results(settings=None, user_id: str | None = None) -> None:
     with download_right:
         if report_path:
             download_button(st, "Download JSON report", report_path, "application/json")
+
+    _save_section(
+        kind="video",
+        settings=settings,
+        user_id=user_id,
+        report=report,
+        report_path=report_path,
+        original_path=st.session_state.get("video_input"),
+        annotated_path=output_path,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Save to My Observations (shared by image + video)
+# --------------------------------------------------------------------------- #
+def _save_section(
+    *,
+    kind: str,
+    settings,
+    user_id: str | None,
+    report: dict | None,
+    report_path: str | None,
+    original_path: str | None,
+    annotated_path: str | None,
+) -> None:
+    """Offer an explicit "Save" action on the results screen.
+
+    Saving persists the finished run as a private observation record. It never
+    re-runs the detector: the media, detections and model metadata already on
+    disk are stored as-is. Saving the same media twice re-opens the existing
+    record instead of creating a duplicate.
+    """
+    if not report or not original_path or not annotated_path:
+        return
+
+    st.markdown("### Save to My Observations")
+    if user_id is None:
+        notice(
+            st,
+            "info",
+            "Sign in to save",
+            "Saved observations are private to an account. Sign in to keep this "
+            "analysis in your own observation library.",
+            icon="lock",
+        )
+        return
+
+    notice(
+        st,
+        "info",
+        "Turn this into a record",
+        "Keep the media, detections, model and your notes in a private, "
+        "searchable library. The detector is not run again.",
+        icon="bookmark_add",
+    )
+    st.text_input(
+        "Survey / project (optional)",
+        key=f"save_{kind}_project",
+        placeholder="e.g. Freshwater survey 2026",
+    )
+    st.text_area(
+        "Research notes (optional)",
+        key=f"save_{kind}_notes",
+        height=80,
+        placeholder="Habitat, location, method, anything worth keeping with this record.",
+    )
+
+    saved_key = f"saved_observation_{kind}"
+    if st.button(
+        "Save observation",
+        key=f"save_{kind}_button",
+        icon=":material/bookmark_add:",
+        width="stretch",
+    ):
+        try:
+            analysis, created = state.save_observation(
+                user_id=user_id,
+                kind=kind,
+                report=report,
+                original_path=original_path,
+                annotated_path=annotated_path,
+                report_path=report_path,
+            )
+        except ObservationError as exc:
+            error_card(
+                st,
+                "Could not save this observation",
+                str(exc),
+                hint="Nothing was stored. Your detection result above is unaffected.",
+                log=False,
+            )
+            return
+        project = st.session_state.get(f"save_{kind}_project", "")
+        notes = st.session_state.get(f"save_{kind}_notes", "")
+        if project or notes:
+            state.observation_store(settings).update_analysis(
+                analysis.id, user_id, project=project or None, notes=notes or None
+            )
+        st.session_state[f"saved_observation_{kind}"] = analysis.id
+        if created:
+            st.success("Saved to My Observations. It is private to your account.")
+        else:
+            st.info("This analysis was already saved — showing the existing record.")
+
+    saved_id = st.session_state.get(f"saved_observation_{kind}")
+    if saved_id:
+        if st.button(
+            "Open in My Observations",
+            key=f"open_saved_{kind}",
+            icon=":material/open_in_new:",
+            width="stretch",
+        ):
+            st.session_state["observation_open"] = saved_id
+            state.navigate("observations")

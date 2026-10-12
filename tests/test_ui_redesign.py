@@ -49,7 +49,7 @@ def test_required_navigation_links_are_present() -> None:
 
 def test_sidebar_groups_match_the_brief() -> None:
     grouped = {title: ids for title, ids in theme.NAV_GROUPS}
-    assert grouped["Main"] == ("dashboard", "detect")
+    assert grouped["Main"] == ("dashboard", "detect", "observations")
     assert grouped["Explore"] == ("history", "species", "models", "analytics")
     assert grouped["Information"] == ("about", "help")
 
@@ -294,6 +294,7 @@ def test_private_pages_are_gated_and_public_pages_are_open() -> None:
     assert auth_ui.PRIVATE_PAGES == {
         "dashboard",
         "detect",
+        "observations",
         "history",
         "analytics",
         "compare",

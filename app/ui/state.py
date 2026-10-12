@@ -28,6 +28,9 @@ from app.config import (
 )
 from app.detection.detector import MarineDetector
 from app.detection.model_manager import ModelSpec
+from app.observations.builder import build_analysis
+from app.observations.models import Analysis, ObservationError
+from app.observations.store import ObservationStore
 from app.processing.enhancement import EnhancementConfig
 from app.utils.file_utils import unique_output_path
 from app.utils.history import HistoryEntry, add_entry, history_path
@@ -70,6 +73,76 @@ def get_settings_cached():
     settings = get_settings()
     settings.ensure_dirs()
     return settings
+
+
+@st.cache_resource(show_spinner=False)
+def get_observation_store(db_path: str) -> ObservationStore:
+    """One observation store per database path (survives reruns/restarts)."""
+    return ObservationStore(db_path)
+
+
+# --------------------------------------------------------------------------- #
+# Persistent observation records
+# --------------------------------------------------------------------------- #
+def observation_store(settings: Any) -> ObservationStore:
+    """The cached observation store for the current configuration."""
+    return get_observation_store(str(settings.observations_db_path))
+
+
+def owned_media(settings: Any, user_id: str | None, path: str | Path | None) -> Path | None:
+    """Return ``path`` only when it is owned by the account and still exists.
+
+    Used before rendering or embedding saved evidence, so a tampered record can
+    never expose another account's file (or an arbitrary file on disk).
+    """
+    if not path:
+        return None
+    candidate = Path(path)
+    if not is_owned_path(settings, user_id, candidate):
+        return None
+    return candidate if candidate.is_file() else None
+
+
+def save_observation(
+    *,
+    user_id: str,
+    kind: str,
+    report: dict[str, Any] | None,
+    original_path: Path | str,
+    annotated_path: Path | str | None,
+    report_path: Path | str | None,
+    source_filename: str | None = None,
+    notes: str = "",
+    project: str = "",
+    location: str = "",
+    habitat: str = "",
+) -> tuple[Analysis, bool]:
+    """Persist a finished run as a durable observation record.
+
+    This never runs inference: it stores exactly what the pipeline already
+    produced. If the same media was already saved for this account, the
+    existing record is returned instead of creating a duplicate.
+
+    Returns ``(analysis, created)`` and raises :class:`ObservationError` on a
+    storage failure (the caller surfaces the message; no partial record is
+    left behind because the insert is a single transaction).
+    """
+    settings = get_settings_cached()
+    store = get_observation_store(str(settings.observations_db_path))
+    annotated = str(annotated_path) if annotated_path else None
+    existing = store.find_existing(user_id, str(original_path), annotated)
+    if existing is not None:
+        return existing, False
+    analysis = build_analysis(
+        user_id=user_id,
+        kind=kind,
+        report=report,
+        original_path=original_path,
+        annotated_path=annotated_path,
+        report_path=report_path,
+    )
+    store.save_analysis(analysis)
+    return analysis, True
 
 
 # --------------------------------------------------------------------------- #
@@ -357,6 +430,10 @@ PRIVATE_SESSION_KEYS = (
     "video_report",
     "video_stats",
     "video_total_hint",
+    "observation_open",
+    "observation_flash",
+    "observations_offset",
+    "observations_query",
 )
 
 

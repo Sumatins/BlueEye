@@ -32,6 +32,7 @@ import streamlit as st
 PAGES: tuple[tuple[str, str, str], ...] = (
     ("dashboard", "Dashboard", "home"),
     ("detect", "AI Detection", "center_focus_strong"),
+    ("observations", "My Observations", "bookmarks"),
     ("history", "Detection History", "history"),
     ("species", "Species Explorer", "menu_book"),
     ("models", "AI Models", "psychology"),
@@ -46,7 +47,7 @@ PAGES: tuple[tuple[str, str, str], ...] = (
 #: Sidebar section grouping: (section title, page ids in display order).
 #: The ids must match :data:`PAGES`; section headers are rendered by CSS.
 NAV_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Main", ("dashboard", "detect")),
+    ("Main", ("dashboard", "detect", "observations")),
     ("Explore", ("history", "species", "models", "analytics")),
     ("Research", ("compare", "evaluation")),
     ("Information", ("about", "help")),

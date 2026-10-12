@@ -1459,6 +1459,26 @@ def get_species(species_id: str) -> Species | None:
     return None
 
 
+#: Model class ids that map one-to-one to a catalogue profile. Only these can
+#: be shown with a scientific name: a generic ``fish`` / ``shark`` class does
+#: **not** establish a species identity and never gets a catalogue profile.
+CLASS_SPECIES: dict[str, str] = {
+    "cheilinus_undulatus": "humphead_wrasse",
+    "bolbometopon_muricatum": "humphead_parrotfish",
+    "cromileptes_altivelis": "camouflage_grouper",
+    "crown_of_thorns": "crown_of_thorns",
+}
+
+
+def species_for_class(class_id: str) -> Species | None:
+    """The verified catalogue profile for a model class, if one exists.
+
+    Returns ``None`` for broad classes (``fish``, ``shark``, ...) where the
+    model does not support a species-level identification.
+    """
+    return get_species(CLASS_SPECIES.get(class_id, ""))
+
+
 def all_habitats(species: Sequence[Species] = SPECIES) -> list[str]:
     return sorted({item.habitat for item in species})
 
@@ -1468,6 +1488,7 @@ def all_groups(species: Sequence[Species] = SPECIES) -> list[str]:
 
 
 __all__ = [
+    "CLASS_SPECIES",
     "DETECTION_CATEGORIES",
     "DETECTION_ORDER",
     "Species",
@@ -1475,6 +1496,7 @@ __all__ = [
     "search_species",
     "filter_species",
     "get_species",
+    "species_for_class",
     "all_habitats",
     "all_groups",
 ]

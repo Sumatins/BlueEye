@@ -83,6 +83,15 @@ dashboard with statistics and a machine-readable JSON report.
   models, thresholds and outputs; search by file/species, filter by type and
   model, re-open any run, delete a single run behind a confirmation, and
   export (CSV / research-summary JSON)
+- **My Observations** — turn any finished detection into a durable, private
+  research record with an explicit **Save** action: each analysis keeps its
+  original and annotated media, model, confidence and detections, while the
+  one-image-may-hold-many-animals distinction is preserved. Saved records are
+  searchable and filterable (label, filename, project, notes, date, model,
+  review status), can be opened in a detail view, annotated with private notes
+  and collection/survey membership, flagged for review, corrected (the original
+  model prediction is never overwritten), compared side by side and exported as
+  CSV / JSON / a printable HTML report — all scoped to the owning account
 - **Analytics** — real charts computed from that history (top species,
   confidence distribution, models used) — never fabricated numbers
 - **Model Comparison** — run several installed models on the *same* image and
@@ -314,7 +323,8 @@ Open http://localhost:8501 and use the sidebar navigation:
 | Page | What it does |
 | --- | --- |
 | **Dashboard** | Aquatic-biodiversity landing page: branding hero, real *Detect an Image* / *Analyse a Video* actions, an "Explore BlueEye" launcher, "How BlueEye works", capabilities and a responsible-use note |
-| **AI Detection** | The single detection workflow for **both** image and video (chosen with the media-type selector): upload → choose model → set confidence → **Detect** → results, with a real frame-by-frame progress bar for video |
+| **AI Detection** | The single detection workflow for **both** image and video (chosen with the media-type selector): upload → choose model → set confidence → **Detect** → results, with a real frame-by-frame progress bar for video. Results carry an explicit **Save observation** action |
+| **My Observations** | Your private, searchable library of saved detections: filter by date/model/review status/project, open a detail view (original + annotated media, identification, review and corrections, notes), organise into surveys/collections, compare saved predictions side by side, and export CSV / JSON / a printable HTML report |
 | **Species Explorer** | An educational reference library of aquatic species with search and habitat/group filters, a detail view, and an honest per-species note on whether any active model can detect it |
 | **Models** | The single source of truth: grouped into *Ready and verified* / *Downloadable but not yet verified* / *Unavailable or incompatible*, with architecture, runtime, classes, licence, image/video verification, limitations and an inference check; download weights |
 | **Analytics** | Charts computed from your stored detections (top species, confidence distribution) |
@@ -418,10 +428,10 @@ server-verified session — nothing is trusted from the browser.
 - **Sign-out** — revokes the session in the database first, then clears the
   local state. If server-side revocation genuinely fails, the UI says so
   instead of claiming success.
-- **Protected routes** — Dashboard, AI Detection, Detection History, Analytics,
-  Model Comparison, Research Evaluation and Account require a signed-in user.
-  Species Explorer, AI Models, About and Help stay public (with a sign-in
-  prompt).
+- **Protected routes** — Dashboard, AI Detection, My Observations, Detection
+  History, Analytics, Model Comparison, Research Evaluation and Account require
+  a signed-in user. Species Explorer, AI Models, About and Help stay public
+  (with a sign-in prompt).
 - **Per-account data** — detection history, uploads, annotated outputs and JSON
   reports are stored under per-account directories
   (`outputs/history/users/<user_id>/`, `data/input/<user_id>/`, …). The user id
@@ -730,6 +740,12 @@ blueeye/
 │   │   ├── security.py             # hashing, token generation, validation
 │   │   ├── store.py                # users + sessions SQLite persistence
 │   │   └── service.py              # register / login / logout / profile logic
+│   ├── observations/               # saved, user-owned detection records
+│   │   ├── models.py               # Analysis / DetectionRecord / Correction / Collection
+│   │   ├── store.py                # SQLite persistence (ownership in every query)
+│   │   ├── builder.py              # report -> record (inference-free)
+│   │   ├── export.py               # CSV / JSON / printable HTML exports
+│   │   └── compare.py              # side-by-side comparison of saved predictions
 │   ├── processing/
 │   │   ├── image_processor.py      # image pipeline
 │   │   ├── video_processor.py      # frame-by-frame video pipeline
@@ -776,6 +792,8 @@ blueeye/
 │   ├── reports/                    # JSON reports (per-account subdirs)
 │   ├── history/                    # persisted detection history (per account)
 │   ├── evaluation/                 # evaluation runs (results.json, CSVs, summary)
+│   ├── observations/               # saved observation records (own SQLite DB)
+│   │   └── blueeye_observations.db
 │   └── auth/blueeye_auth.db        # accounts + sessions (git-ignored)
 ├── assets/                         # sample media from marine-detect
 ├── tests/                          # pytest suite (unit + integration)

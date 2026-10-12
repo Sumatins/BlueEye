@@ -33,7 +33,7 @@ from app.content.species import Species, get_species
 from app.detection.detector import MarineDetector
 from app.detection.results import display_class_name
 from app.ui import state
-from app.ui.components import badge, empty_state, kv
+from app.ui.components import badge, empty_state, kv, metrics_row, section_title
 from app.ui.icons import span
 from app.ui.theme import esc
 from app.utils.file_utils import read_file_bytes
@@ -106,6 +106,7 @@ def render(detector: MarineDetector, settings, user=None) -> None:
 
     _hero_band()
     _marine_stats(registry, stats, available)
+    _research_records(settings, user_id)
     _latest_detection(entries, registry, settings, user_id)
     _indian_biodiversity()
     _biodiversity_overview(entries)
@@ -189,6 +190,97 @@ def _marine_stats(registry: dict, stats: dict, available: list[str]) -> None:
 # --------------------------------------------------------------------------- #
 # 3. Latest detection (original vs annotated vs details)
 # --------------------------------------------------------------------------- #
+def _research_records(settings, user_id: str | None) -> None:
+    """Real, account-scoped numbers for the private observation library.
+
+    Nothing here is estimated: every value comes from the saved-records
+    database for the signed-in account, and the empty state is explicit when
+    the account has not saved anything yet.
+    """
+    section_title(st, "Saved research records", "Your private observation library")
+    if not user_id:
+        empty_state(
+            st,
+            "lock",
+            "Sign in to see your records",
+            "Saved observations are private to the account that created them.",
+        )
+        return
+
+    store = state.observation_store(settings)
+    research = store.stats(user_id)
+    if research["analyses"] == 0:
+        empty_state(
+            st,
+            "bookmarks",
+            "No saved observations yet",
+            "Run a detection on the AI Detection page and choose 'Save observation' "
+            "to start building your private library.",
+        )
+        if st.button(
+            "Open AI Detection",
+            key="dash_open_detect",
+            icon=":material/center_focus_strong:",
+        ):
+            state.navigate("detect")
+        return
+
+    metrics_row(
+        st,
+        [
+            ("Saved observations", research["observations"], "individual detections"),
+            ("Analyses", research["analyses"], "saved images / videos"),
+            ("Awaiting review", research["awaiting_review"], "predicted or flagged"),
+            ("Collections", research["collections"], "surveys / projects"),
+        ],
+    )
+
+    actions = st.columns(3)
+    with actions[0]:
+        if st.button("Browse all saved", key="dash_obs_all", width="stretch"):
+            _open_observations({"observations_status": "All", "observations_offset": 0})
+    with actions[1]:
+        if st.button("Needs review", key="dash_obs_review", width="stretch"):
+            _open_observations(
+                {"observations_status": "needs_review", "observations_offset": 0}
+            )
+    with actions[2]:
+        if st.button("Open collections", key="dash_obs_collections", width="stretch"):
+            _open_observations({"observations_offset": 0})
+
+    if research["recent"]:
+        st.markdown("**Recently saved observations**")
+        for item in research["recent"]:
+            columns = st.columns([5, 1])
+            with columns[0]:
+                st.markdown(
+                    f"**{esc(item.source_filename)}** · {esc(item.detected_at)} · "
+                    f"{item.total_detections} object(s) · {esc(item.status_label)}",
+                    unsafe_allow_html=True,
+                )
+            with columns[1]:
+                if st.button("Open", key=f"dash_obs_open_{item.id}", width="stretch"):
+                    st.session_state["observation_open"] = item.id
+                    state.navigate("observations")
+
+    if research["recent_collections"]:
+        st.markdown("**Recently updated collections**")
+        for collection in research["recent_collections"]:
+            st.markdown(
+                f"- **{esc(collection.name)}** · {collection.item_count} observation(s) "
+                f"· updated {esc(collection.updated_at)}",
+                unsafe_allow_html=True,
+            )
+
+
+def _open_observations(overrides: dict) -> None:
+    """Jump to My Observations with a specific filter applied."""
+    for key, value in overrides.items():
+        st.session_state[key] = value
+    st.session_state.pop("observation_open", None)
+    state.navigate("observations")
+
+
 def _latest_detection(entries: list, registry: dict, settings=None, user_id=None) -> None:
     """Show the newest real result with full media comparison, or an empty state."""
     st.markdown("### Latest Detection")

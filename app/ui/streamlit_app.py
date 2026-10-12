@@ -37,6 +37,7 @@ from app.ui.pages import (  # noqa: E402
     help_page,
     history_page,
     models,
+    observations,
     species,
 )
 from app.ui.icons import span  # noqa: E402
@@ -55,6 +56,7 @@ PAGE_MODULES = {
     "species": species,
     "models": models,
     "analytics": analytics,
+    "observations": observations,
     "compare": compare,
     "evaluation": evaluation,
     "history": history_page,

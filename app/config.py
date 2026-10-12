@@ -96,6 +96,15 @@ def _env_int(key: str, default: int) -> int:
         return default
 
 
+def _env_list(key: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    """Parse a comma-separated environment variable into a tuple of strings."""
+    raw = os.environ.get(ENV_PREFIX + key)
+    if raw is None:
+        return default
+    items = tuple(part.strip() for part in raw.split(",") if part.strip())
+    return items
+
+
 def _resolve_path(value: str | Path, default: Path) -> Path:
     """Resolve a possibly relative path against the project root."""
     path = Path(value)
@@ -127,10 +136,18 @@ class Settings:
     # unless overridden, so it is never committed and survives container
     # restarts when the outputs volume is mounted.
     auth_db: Path | None = None
+    #: Persistent observation records database (see app/observations). Kept in
+    #: a *separate* SQLite file from authentication so observation migrations
+    #: can never touch accounts or sessions.
+    observations_db: Path | None = None
     #: How long a session token stays valid (days, server-side expiry).
     session_ttl_days: int = 7
     #: Minimum password length enforced at registration / password change.
     password_min_length: int = 8
+    #: Emails allowed to *formally verify* an identification. Empty by default:
+    #: a user may correct their own records, but verified status is only ever
+    #: granted to an explicitly configured reviewer. Never guessed or inferred.
+    reviewer_emails: tuple[str, ...] = ()
 
     # Logging.
     log_level: str = "INFO"
@@ -150,6 +167,33 @@ class Settings:
             return self.outputs_dir / "auth" / "blueeye_auth.db"
         path = self.auth_db
         return path if path.is_absolute() else PROJECT_ROOT / path
+
+    @property
+    def observations_db_path(self) -> Path:
+        """Location of the SQLite observation-records database.
+
+        Defaults to ``<outputs>/observations/blueeye_observations.db`` so saved
+        observations live alongside all other runtime data and are covered by
+        the same backup / volume mount. This file is independent of the auth
+        database, so the two migration timelines can never interfere.
+        """
+        if self.observations_db is None:
+            return self.outputs_dir / "observations" / "blueeye_observations.db"
+        path = self.observations_db
+        return path if path.is_absolute() else PROJECT_ROOT / path
+
+    def is_reviewer(self, email: str | None) -> bool:
+        """Whether ``email`` may formally verify an identification.
+
+        Returns ``False`` unless the account is listed in
+        ``BLUEEYE_REVIEWER_EMAILS``. This is the only path to ``verified``
+        status: a user can always correct their own records, but cannot
+        self-certify a species identification.
+        """
+        if not email:
+            return False
+        wanted = email.strip().lower()
+        return any(wanted == candidate.strip().lower() for candidate in self.reviewer_emails)
 
     @property
     def session_ttl_seconds(self) -> int:
@@ -184,6 +228,7 @@ class Settings:
             self.images_output_dir,
             self.videos_output_dir,
             self.reports_output_dir,
+            self.observations_db_path.parent,
         ):
             directory.mkdir(parents=True, exist_ok=True)
 
@@ -254,8 +299,15 @@ def get_settings() -> Settings:
         auth_db=_resolve_path(_env_str("AUTH_DB", ""), PROJECT_ROOT / "outputs" / "auth" / "blueeye_auth.db")
         if _env_str("AUTH_DB", "")
         else None,
+        observations_db=_resolve_path(
+            _env_str("OBSERVATIONS_DB", ""),
+            PROJECT_ROOT / "outputs" / "observations" / "blueeye_observations.db",
+        )
+        if _env_str("OBSERVATIONS_DB", "")
+        else None,
         session_ttl_days=_env_int("SESSION_TTL_DAYS", 7),
         password_min_length=_env_int("PASSWORD_MIN_LENGTH", 8),
+        reviewer_emails=_env_list("REVIEWER_EMAILS", ()),
         log_level=_env_str("LOG_LEVEL", "INFO").upper(),
     )
     get_settings._cache = settings  # type: ignore[attr-defined]

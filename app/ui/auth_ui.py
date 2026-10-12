@@ -72,7 +72,16 @@ _FLASH_KEY = "be_account_flash"
 #: Private workspace pages: anonymous visitors see the sign-in gate here.
 #: Species / map / models / about / help stay public.
 PRIVATE_PAGES = frozenset(
-    {"dashboard", "detect", "history", "analytics", "compare", "evaluation", "account"}
+    {
+        "dashboard",
+        "detect",
+        "observations",
+        "history",
+        "analytics",
+        "compare",
+        "evaluation",
+        "account",
+    }
 )
 
 #: One-time notice flags surfaced to the user after a partially failed logout.
