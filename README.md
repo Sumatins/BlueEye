@@ -827,7 +827,9 @@ Indian model is shipped or claimed before that happens.
 (`app/evaluation/`, `scripts/run_evaluation.py`) and the paper draft
 ([`PAPER.md`](PAPER.md)) are in place. The next step is a licensed,
 labelled Indian-region test set so the PENDING experiment can be run; see
-[`docs/evaluation.md`](docs/evaluation.md) for the dataset short-list.
+[`docs/evaluation.md`](docs/evaluation.md) for the dataset short-list. To
+demonstrate the application itself, follow
+[`docs/competition_demo.md`](docs/competition_demo.md).
 
 ## Credits & License
 
