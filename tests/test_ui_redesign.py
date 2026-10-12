@@ -296,11 +296,27 @@ def test_private_pages_are_gated_and_public_pages_are_open() -> None:
         "detect",
         "history",
         "analytics",
+        "compare",
+        "evaluation",
         "account",
     }
     # Species / models / about / help must remain browsable anonymously.
     public = {"species", "models", "about", "help"}
     assert public.isdisjoint(auth_ui.PRIVATE_PAGES)
+
+
+def test_research_pages_are_in_the_navigation() -> None:
+    """The comparison and evaluation consoles ship as first-class pages."""
+    page_ids = [page_id for page_id, _, _ in theme.PAGES]
+    labels = [label for _, label, _ in theme.PAGES]
+    assert "compare" in page_ids
+    assert "evaluation" in page_ids
+    assert "Model Comparison" in labels
+    assert "Research Evaluation" in labels
+    grouped = {title: ids for title, ids in theme.NAV_GROUPS}
+    assert grouped["Research"] == ("compare", "evaluation")
+    # Both resolve to real page modules.
+    assert PAGE_MODULES["compare"] is not PAGE_MODULES["evaluation"]
 
 
 def test_auth_ui_uses_the_real_backend() -> None:

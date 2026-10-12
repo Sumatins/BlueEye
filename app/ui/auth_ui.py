@@ -71,7 +71,9 @@ _FLASH_KEY = "be_account_flash"
 
 #: Private workspace pages: anonymous visitors see the sign-in gate here.
 #: Species / map / models / about / help stay public.
-PRIVATE_PAGES = frozenset({"dashboard", "detect", "history", "analytics", "account"})
+PRIVATE_PAGES = frozenset(
+    {"dashboard", "detect", "history", "analytics", "compare", "evaluation", "account"}
+)
 
 #: One-time notice flags surfaced to the user after a partially failed logout.
 _REVOCATION_WARN_KEY = "be_auth_revocation_warning"

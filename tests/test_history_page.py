@@ -20,7 +20,7 @@ from PIL import Image
 from streamlit.testing.v1 import AppTest
 
 from app.config import Settings, reset_settings_cache
-from app.utils.history import HistoryEntry, add_entry, history_path
+from app.utils.history import HistoryEntry, add_entry, history_path, load_entries
 
 APP = str(Path(__file__).resolve().parents[1] / "app" / "ui" / "streamlit_app.py")
 
@@ -184,3 +184,60 @@ def test_history_is_empty_for_a_brand_new_account(app_env) -> None:
     assert not at.exception, at.exception
     blob = _rendered_text(at)
     assert "No detections recorded yet" in blob
+
+
+# --------------------------------------------------------------------------- #
+# Search, filter and delete
+# --------------------------------------------------------------------------- #
+def _seed_named(app_env: Path, user_id: str, filename: str, classes: dict, ts: str) -> None:
+    settings = _settings_for(app_env)
+    add_entry(
+        HistoryEntry(
+            timestamp=ts,
+            kind="image",
+            filename=filename,
+            models=["fish_inv"],
+            total_detections=sum(classes.values()),
+            unique_classes=len(classes),
+            average_confidence=0.7,
+            max_confidence=0.8,
+            confidence_threshold=0.5,
+            detections_per_class=classes,
+            user_id=user_id,
+        ),
+        path=history_path(settings, user_id=user_id),
+    )
+
+
+def test_history_search_filters_the_visible_runs(app_env) -> None:
+    at = _register(_app("dashboard"), "Ada", "ada@example.org", "secreT123")
+    user_id = at.session_state["be_auth_user_id"]
+    _seed_named(app_env, user_id, "reef_photo.jpg", {"scaridae": 1}, "2026-10-08T19:42:00")
+    _seed_named(app_env, user_id, "boat_photo.jpg", {"fish": 1}, "2026-10-08T19:43:00")
+
+    at = _goto(at, "history")
+    assert not at.exception, at.exception
+
+    _by_key(at.text_input, "history_query").set_value("reef")
+    at.run()
+
+    assert not at.exception, at.exception
+    assert "Showing 1 of 2 run(s)." in _rendered_text(at)
+
+
+def test_history_delete_removes_the_confirmed_run(app_env) -> None:
+    at = _register(_app("dashboard"), "Ada", "ada@example.org", "secreT123")
+    user_id = at.session_state["be_auth_user_id"]
+    _seed_image_run(app_env, user_id)
+    store = history_path(_settings_for(app_env), user_id=user_id)
+
+    at = _goto(at, "history")
+    assert not at.exception, at.exception
+
+    _by_key(at.checkbox, "history_delete_confirm").set_value(True)
+    at.run()
+    _by_key(at.button, "history_delete").click()
+    at.run()
+
+    assert not at.exception, at.exception
+    assert load_entries(store) == []

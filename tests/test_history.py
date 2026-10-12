@@ -9,12 +9,17 @@ import pytest
 
 from app.config import Settings
 from app.utils.history import (
+    CSV_COLUMNS,
     HistoryEntry,
     add_entry,
     clear_history,
     confidence_histogram,
+    entries_csv,
+    filter_entries,
     history_path,
     load_entries,
+    remove_entry,
+    research_summary,
     summarize,
 )
 
@@ -200,3 +205,67 @@ def test_confidence_histogram_buckets_real_values() -> None:
     assert buckets["70–80%"] == 1
     assert buckets["60–70%"] == 1
     assert sum(buckets.values()) == 2
+
+
+# --------------------------------------------------------------------------- #
+# Filtering, deletion and export
+# --------------------------------------------------------------------------- #
+def test_run_id_is_stable_and_field_derived() -> None:
+    entry = HistoryEntry.from_report("image", IMAGE_REPORT, "a.jpg")
+    assert entry.run_id == entry.run_id
+    assert entry.run_id.startswith("run-")
+    # A different run (different filename) yields a different id.
+    other = HistoryEntry.from_report("image", dict(IMAGE_REPORT, input="b.jpg"), "a.jpg")
+    assert other.run_id != entry.run_id
+
+
+def test_remove_entry_deletes_only_the_target(tmp_path: Path) -> None:
+    path = tmp_path / "history.json"
+    add_entry(HistoryEntry.from_report("image", dict(IMAGE_REPORT, input="a.jpg"), "o.jpg"), path)
+    add_entry(HistoryEntry.from_report("video", VIDEO_REPORT, "o.mp4"), path)
+
+    remaining = remove_entry(path, 0)  # newest (the video) first
+
+    assert [e.filename for e in remaining] == ["a.jpg"]
+    assert [e.filename for e in load_entries(path)] == ["a.jpg"]
+
+
+def test_remove_entry_out_of_range_is_a_noop(tmp_path: Path) -> None:
+    path = tmp_path / "history.json"
+    add_entry(HistoryEntry.from_report("image", IMAGE_REPORT, "o.jpg"), path)
+    remaining = remove_entry(path, 99)
+    assert len(remaining) == 1
+
+
+def test_filter_entries_by_query_kind_and_model() -> None:
+    entries = _sample_entries()  # video dive.mp4 (fish_inv), image reef.jpg (fish_inv + megafauna)
+
+    assert [e.filename for e in filter_entries(entries, query="reef")] == ["reef.jpg"]
+    assert [e.filename for e in filter_entries(entries, query="scaridae")] == [
+        "dive.mp4",
+        "reef.jpg",
+    ]
+    assert [e.filename for e in filter_entries(entries, kind="video")] == ["dive.mp4"]
+    assert [e.filename for e in filter_entries(entries, model="megafauna")] == ["reef.jpg"]
+    assert filter_entries(entries, query="nothing-matches") == []
+
+
+def test_entries_csv_has_header_and_real_rows() -> None:
+    text = entries_csv(_sample_entries())
+    lines = text.strip().splitlines()
+    assert lines[0] == ",".join(CSV_COLUMNS)
+    assert len(lines) == 3
+    assert "dive.mp4" in text
+    # Per-class counts are flattened, not fabricated.
+    assert "scaridae=12" in text
+
+
+def test_research_summary_labels_predictions_not_accuracy() -> None:
+    summary = research_summary(_sample_entries())
+    assert summary["runs"][0]["run_id"].startswith("run-")
+    assert summary["runs"][0]["input"] == "dive.mp4"
+    assert "NOT ground-truth-validated" in summary["disclaimer"]
+    assert summary["aggregate"]["runs"] == 2
+    # There is deliberately no fabricated metric block.
+    assert "mAP50" not in summary
+

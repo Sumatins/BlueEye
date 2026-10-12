@@ -336,6 +336,7 @@ def is_owned_path(settings: Any, user_id: str, path: str | Path | None) -> bool:
         settings.videos_output_dir / user_id,
         settings.reports_output_dir / user_id,
         settings.outputs_dir / "history" / "users" / user_id,
+        settings.outputs_dir / "evaluation" / user_id,
     )
     for root in roots:
         try:

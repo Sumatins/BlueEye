@@ -80,9 +80,21 @@ dashboard with statistics and a machine-readable JSON report.
   average / maximum confidence, frames processed, processing speed
 - **JSON reports** for every image/video processed
 - **Detection history** — every finished run persisted locally with inputs,
-  models, thresholds and outputs (exportable, clearable)
+  models, thresholds and outputs; search by file/species, filter by type and
+  model, re-open any run, delete a single run behind a confirmation, and
+  export (CSV / research-summary JSON)
 - **Analytics** — real charts computed from that history (top species,
   confidence distribution, models used) — never fabricated numbers
+- **Model Comparison** — run several installed models on the *same* image and
+  see each model's real detections, confidences and inference timing side by
+  side, with an explicit note that class lists differ so the columns are not
+  interchangeable (a qualitative check, not a benchmark)
+- **Research Evaluation Center** — the UI over the reproducible evaluation
+  pipeline: pick a locally prepared labelled dataset and split, run the
+  unmodified detectors, and read real precision / recall / mAP@0.5 /
+  mAP@0.5:0.95 with per-class tables, charts and JSON/CSV/Markdown downloads.
+  When no labelled dataset is present it clearly reports the experiment as
+  **pending** and never invents a score
 - **Downloadable results** — annotated image/video + JSON from the UI
 - **Real accounts and protected pages** — local registration and login
   (bcrypt-hashed passwords, server-side sessions), persistent sessions that
@@ -302,16 +314,17 @@ Open http://localhost:8501 and use the sidebar navigation:
 | Page | What it does |
 | --- | --- |
 | **Dashboard** | Aquatic-biodiversity landing page: branding hero, real *Detect an Image* / *Analyse a Video* actions, an "Explore BlueEye" launcher, "How BlueEye works", capabilities and a responsible-use note |
-| **Detect Image** | The detection workflow with the media type set to **Image**: upload → choose model → set confidence → **Detect** → results |
-| **Detect Video** | The same workflow with the media type set to **Video**, with a real frame-by-frame progress bar |
+| **AI Detection** | The single detection workflow for **both** image and video (chosen with the media-type selector): upload → choose model → set confidence → **Detect** → results, with a real frame-by-frame progress bar for video |
 | **Species Explorer** | An educational reference library of aquatic species with search and habitat/group filters, a detail view, and an honest per-species note on whether any active model can detect it |
 | **Models** | The single source of truth: grouped into *Ready and verified* / *Downloadable but not yet verified* / *Unavailable or incompatible*, with architecture, runtime, classes, licence, image/video verification, limitations and an inference check; download weights |
 | **Analytics** | Charts computed from your stored detections (top species, confidence distribution) |
-| **History** | Every finished run with inputs, models, thresholds and outputs; export/clear |
+| **Model Comparison** | Run several installed models on one image and compare their real detections, confidences and timing side by side |
+| **Research Evaluation** | Run the reproducible evaluation pipeline over a labelled dataset: real precision / recall / mAP with per-class tables, charts and exports; stays *pending* without a dataset |
+| **History** | Every finished run with inputs, models, thresholds and outputs; search, filter, re-open, delete a run and export (CSV / research summary) |
 | **About** | What BlueEye does, how it works, limitations and attribution |
 
-The sidebar groups the pages (*Overview* / *Detection* / *Explore* / *Activity*
-/ *Information*) and shows only a compact readiness indicator — **no individual
+The sidebar groups the pages (*Main* / *Explore* / *Research* / *Information*
+/ *Account*) and shows only a compact readiness indicator — **no individual
 model names or per-model badges**; the Models page is the single source of
 truth for model status. Hardware/device details live on the Models and About
 pages. A single icon set — **Material Symbols Rounded**, bundled locally with
@@ -405,9 +418,10 @@ server-verified session — nothing is trusted from the browser.
 - **Sign-out** — revokes the session in the database first, then clears the
   local state. If server-side revocation genuinely fails, the UI says so
   instead of claiming success.
-- **Protected routes** — Dashboard, AI Detection, Detection History, Analytics
-  and Account require a signed-in user. Species Explorer, AI Models, About
-  and Help stay public (with a sign-in prompt).
+- **Protected routes** — Dashboard, AI Detection, Detection History, Analytics,
+  Model Comparison, Research Evaluation and Account require a signed-in user.
+  Species Explorer, AI Models, About and Help stay public (with a sign-in
+  prompt).
 - **Per-account data** — detection history, uploads, annotated outputs and JSON
   reports are stored under per-account directories
   (`outputs/history/users/<user_id>/`, `data/input/<user_id>/`, …). The user id
@@ -701,11 +715,13 @@ blueeye/
 │   ├── config.py                   # settings, .env, logging
 │   ├── detection/
 │   │   ├── detector.py             # MarineDetector (inference API)
+│   │   ├── comparison.py           # run several models on one image + coverage
 │   │   ├── model_manager.py        # registry, download, cached loading, device
 │   │   └── results.py              # Detection, stats, JSON reports
 │   ├── evaluation/                 # reproducible evaluation (research pipeline)
 │   │   ├── metrics.py              # IoU, AP, mAP@0.5 / mAP@0.5:0.95
 │   │   ├── datasets.py             # YOLO data.yaml + label reading
+│   │   ├── discovery.py            # find user-prepared datasets on disk
 │   │   ├── compat.py               # dataset <-> model class compatibility
 │   │   ├── runner.py               # run detectors unchanged + timing
 │   │   ├── report.py               # JSON / CSV / Markdown writers
@@ -729,8 +745,9 @@ blueeye/
 │       ├── icons.py                 # single icon set (Material Symbols Rounded)
 │       ├── components.py            # reusable cards, badges, tables, notices
 │       ├── state.py                 # session state, upload intake, history
-│       └── pages/                   # Dashboard, Detect (Image/Video), Models,
-│                                    # Analytics, History, Account, About
+│       └── pages/                   # Dashboard, Detect, Species, Models,
+│                                    # Analytics, Comparison, Evaluation,
+│                                    # History, Account, About, Help
 ├── src/marine_detect/              # upstream reference code (AGPL-3.0, unmodified)
 ├── scripts/
 │   ├── download_models.py          # fetch official weights

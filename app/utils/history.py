@@ -15,6 +15,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 from __future__ import annotations
 
+import csv
+import io
+import json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -157,6 +160,20 @@ class HistoryEntry:
         except (ValueError, TypeError):
             return self.timestamp or "—"
 
+    @property
+    def run_id(self) -> str:
+        """Short, stable identifier for this run (for reports and exports).
+
+        Derived deterministically from the run's real fields (timestamp,
+        kind, filename) so the same stored run always maps to the same id.
+        Nothing is invented: it is a display handle, not a database key.
+        """
+        import hashlib
+
+        seed = f"{self.timestamp}|{self.kind}|{Path(self.filename).name}"
+        digest = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:10]
+        return f"run-{digest}"
+
 
 # --------------------------------------------------------------------------- #
 # Store operations
@@ -178,8 +195,6 @@ def history_path(settings: Settings | None = None, user_id: str | None = None) -
 
 def load_entries(path: str | Path) -> list[HistoryEntry]:
     """Read the history, newest first. Never raises on bad/missing files."""
-    import json
-
     file_path = Path(path)
     if not file_path.is_file():
         return []
@@ -199,20 +214,12 @@ def load_entries(path: str | Path) -> list[HistoryEntry]:
     return entries
 
 
-def add_entry(
-    entry: HistoryEntry,
-    path: str | Path | None = None,
-    max_entries: int = DEFAULT_MAX_ENTRIES,
-) -> list[HistoryEntry]:
-    """Prepend ``entry`` to the store and persist it atomically.
+def _write_entries(file_path: Path, entries: Sequence[HistoryEntry]) -> bool:
+    """Persist ``entries`` to ``file_path`` atomically (best effort).
 
-    Returns the resulting list (newest first). A failed write is logged but
-    never breaks the detection flow that triggered it.
+    Returns ``True`` when the write succeeded. A failure is logged and never
+    raised so a storage problem cannot break the detection flow.
     """
-    import json
-
-    file_path = Path(path) if path else history_path()
-    entries = [entry, *load_entries(file_path)][:max_entries]
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)
         temporary = file_path.with_suffix(file_path.suffix + ".tmp")
@@ -223,7 +230,183 @@ def add_entry(
         os.replace(temporary, file_path)
     except OSError as exc:  # pragma: no cover - disk full / permissions
         logger.warning("Could not persist detection history to %s: %s", file_path, exc)
+        return False
+    return True
+
+
+def add_entry(
+    entry: HistoryEntry,
+    path: str | Path | None = None,
+    max_entries: int = DEFAULT_MAX_ENTRIES,
+) -> list[HistoryEntry]:
+    """Prepend ``entry`` to the store and persist it atomically.
+
+    Returns the resulting list (newest first). A failed write is logged but
+    never breaks the detection flow that triggered it.
+    """
+    file_path = Path(path) if path else history_path()
+    entries = [entry, *load_entries(file_path)][:max_entries]
+    _write_entries(file_path, entries)
     return entries
+
+
+def remove_entry(
+    path: str | Path | None,
+    index: int,
+    *,
+    max_entries: int = DEFAULT_MAX_ENTRIES,
+) -> list[HistoryEntry]:
+    """Delete the entry at ``index`` (newest-first order) and persist.
+
+    Returns the remaining list. An out-of-range index is a no-op, so a stale
+    UI selection can never delete the wrong record. ``path`` is required and
+    is always the caller's own (per-account) store - ownership is enforced by
+    the path the caller passes, never by anything the browser supplies.
+    """
+    file_path = Path(path)
+    entries = load_entries(file_path)
+    if not 0 <= index < len(entries):
+        return entries
+    del entries[index]
+    _write_entries(file_path, entries[:max_entries])
+    return entries
+
+
+def filter_entries(
+    entries: Sequence[HistoryEntry],
+    *,
+    query: str = "",
+    kind: str | None = None,
+    model: str | None = None,
+) -> list[HistoryEntry]:
+    """Filter stored runs by free text, media kind and model key.
+
+    The free-text ``query`` matches (case-insensitively) the input filename or
+    any detected class name. ``kind`` is ``"image"`` / ``"video"``. ``model``
+    matches a model key in the entry's model list. All filters are computed
+    from real stored fields; nothing is inferred.
+    """
+    text = (query or "").strip().casefold()
+    wanted_kind = (kind or "").strip().lower() or None
+    wanted_model = (model or "").strip() or None
+
+    kept: list[HistoryEntry] = []
+    for entry in entries:
+        if wanted_kind and entry.kind != wanted_kind:
+            continue
+        if wanted_model and wanted_model not in entry.models:
+            continue
+        if text:
+            haystack = " ".join(
+                [
+                    Path(entry.filename).name.casefold(),
+                    *(c.casefold() for c in entry.detections_per_class),
+                ]
+            )
+            if text not in haystack:
+                continue
+        kept.append(entry)
+    return kept
+
+
+#: Column order for the CSV export of stored runs.
+CSV_COLUMNS = (
+    "run_id",
+    "timestamp",
+    "kind",
+    "filename",
+    "models",
+    "total_detections",
+    "unique_classes",
+    "average_confidence",
+    "max_confidence",
+    "confidence_threshold",
+    "enhanced",
+    "elapsed_seconds",
+    "frames_processed",
+    "detections_per_class",
+)
+
+
+def entries_csv(entries: Sequence[HistoryEntry]) -> str:
+    """Render stored runs as CSV text (real fields only).
+
+    Per-class counts are encoded as ``name=count`` pairs in a single column so
+    the file stays a flat table that opens cleanly in a spreadsheet.
+    """
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(CSV_COLUMNS)
+    for entry in entries:
+        writer.writerow(
+            [
+                entry.run_id,
+                entry.timestamp,
+                entry.kind,
+                entry.filename,
+                "|".join(entry.models),
+                entry.total_detections,
+                entry.unique_classes,
+                f"{entry.average_confidence:.4f}",
+                f"{entry.max_confidence:.4f}",
+                "" if entry.confidence_threshold is None else f"{entry.confidence_threshold:.4f}",
+                "yes" if entry.enhanced else "no",
+                "" if entry.elapsed_seconds is None else f"{entry.elapsed_seconds:.3f}",
+                "" if entry.frames_processed is None else entry.frames_processed,
+                "|".join(f"{name}={count}" for name, count in entry.detections_per_class.items()),
+            ]
+        )
+    return buffer.getvalue()
+
+
+def research_summary(
+    entries: Sequence[HistoryEntry],
+    *,
+    environment: dict[str, Any] | None = None,
+    config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build an exportable research summary from **real** stored runs.
+
+    These are ordinary inference results, so the document labels them as
+    *predictions* - never ground-truth-validated accuracy. Evaluation metrics
+    (mAP / precision / recall) come from the separate, dataset-backed
+    evaluation pipeline and are deliberately not produced here.
+    """
+    from datetime import timezone
+
+    runs = [
+        {
+            "run_id": entry.run_id,
+            "timestamp": entry.timestamp,
+            "kind": entry.kind,
+            "input": Path(entry.filename).name,
+            "models": list(entry.models),
+            "confidence_threshold": entry.confidence_threshold,
+            "enhanced": entry.enhanced,
+            "detections_per_class": dict(entry.detections_per_class),
+            "total_detections": entry.total_detections,
+            "unique_classes": entry.unique_classes,
+            "average_confidence": round(entry.average_confidence, 4),
+            "max_confidence": round(entry.max_confidence, 4),
+            "processing_seconds": entry.elapsed_seconds,
+            "frames_processed": entry.frames_processed,
+        }
+        for entry in entries
+    ]
+    return {
+        "title": "BlueEye research summary",
+        "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "disclaimer": (
+            "These are model predictions from ordinary inference runs on the "
+            "media listed. They are NOT ground-truth-validated accuracy. "
+            "Detection metrics (precision / recall / mAP) require a labelled "
+            "dataset and are produced only by the Research Evaluation pipeline."
+        ),
+        "aggregate": summarize(entries),
+        "environment": environment or {},
+        "config": config or {},
+        "runs": runs,
+    }
 
 
 def clear_history(path: str | Path | None = None) -> None:
@@ -266,7 +449,9 @@ def summarize(entries: Sequence[HistoryEntry]) -> dict[str, Any]:
         "videos": videos,
         "total_objects": total_objects,
         "unique_species": len(species_counts),
-        "average_confidence": round(weighted_confidence / total_objects, 4) if total_objects else 0.0,
+        "average_confidence": (
+            round(weighted_confidence / total_objects, 4) if total_objects else 0.0
+        ),
         "frames_processed": frames,
         "models_used": sorted(model_keys),
         "species_counts": dict(top),

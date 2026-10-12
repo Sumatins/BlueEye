@@ -36,6 +36,8 @@ PAGES: tuple[tuple[str, str, str], ...] = (
     ("species", "Species Explorer", "menu_book"),
     ("models", "AI Models", "psychology"),
     ("analytics", "Analytics", "bar_chart"),
+    ("compare", "Model Comparison", "compare_arrows"),
+    ("evaluation", "Research Evaluation", "science"),
     ("about", "About BlueEye", "info"),
     ("help", "Help & Documentation", "help"),
     ("account", "Account", "account_circle"),
@@ -46,6 +48,7 @@ PAGES: tuple[tuple[str, str, str], ...] = (
 NAV_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Main", ("dashboard", "detect")),
     ("Explore", ("history", "species", "models", "analytics")),
+    ("Research", ("compare", "evaluation")),
     ("Information", ("about", "help")),
     ("Account", ("account",)),
 )

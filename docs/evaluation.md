@@ -193,3 +193,19 @@ with the **real** detector and the upstream sample image (run with
 `pytest -m integration`); because no annotations are invented for that image
 the metric is honestly `0`, and the test asserts the *plumbing* — every real
 detection is mapped and the report files are written.
+
+## 8.1 Running it from the web UI
+
+The **Research Evaluation** page is the UI over this same pipeline. It
+discovers datasets you prepared under `data/`, lets you choose the split,
+models, confidence and image limit, runs the identical code path as the CLI,
+and shows the headline table, per-class metrics, charts and JSON / CSV /
+Markdown downloads. Results are written under
+`outputs/evaluation/users/<user_id>/<timestamp>/` and are only visible to the
+account that produced them.
+
+When no prepared dataset is found on disk the page reports the experiment as
+**pending** and explains how to configure one - it never invents a score. The
+**Model Comparison** page follows the same rule: it runs several models on one
+image and shows their real detections, confidences and timing side by side
+without presenting them as an accuracy comparison.
