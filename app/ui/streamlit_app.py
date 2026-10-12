@@ -25,6 +25,7 @@ import logging  # noqa: E402
 import streamlit as st  # noqa: E402
 
 from app import __version__  # noqa: E402
+from app.evaluation import scheduler as eval_scheduler  # noqa: E402
 from app.ui import auth_ui, state  # noqa: E402
 from app.ui.pages import (  # noqa: E402
     about,
@@ -152,6 +153,13 @@ def main() -> None:
     # happens before navigation so every page receives a real user object or
     # is treated as anonymous - the browser never supplies an identity.
     user = auth_ui.bootstrap()
+
+    # Continuous evaluation: while a signed-in researcher has BlueEye open, the
+    # worker re-runs due schedules on its own. It is idempotent and only ever
+    # starts one thread, so calling it on every rerun is safe. Guests do not
+    # start it - schedules belong to an account.
+    if user is not None:
+        eval_scheduler.configure(settings, detector)
 
     page = _sidebar(user)
 

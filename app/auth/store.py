@@ -57,6 +57,17 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user   ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_digest ON sessions(token_digest);
 """
 
+#: v2: optional professional profile columns added to ``users``. Applying them
+#: with ``ALTER TABLE ... ADD COLUMN`` upgrades an existing database in place;
+#: a fresh database (created by v1 above) converges to the same shape.
+_PROFILE_COLUMNS = (
+    ("profession", "TEXT NOT NULL DEFAULT ''"),
+    ("organization", "TEXT NOT NULL DEFAULT ''"),
+    ("country", "TEXT NOT NULL DEFAULT ''"),
+    ("research_interests", "TEXT NOT NULL DEFAULT ''"),
+    ("bio", "TEXT NOT NULL DEFAULT ''"),
+)
+
 
 def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -69,6 +80,16 @@ def _ts(value: str | None) -> datetime | None:
         return datetime.fromisoformat(value)
     except (ValueError, TypeError):
         return None
+
+
+def _add_missing_columns(
+    conn: sqlite3.Connection, table: str, columns: tuple[tuple[str, str], ...]
+) -> None:
+    """Idempotently add columns to ``table`` (used by ordered migrations)."""
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    for name, declaration in columns:
+        if name not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {declaration}")
 
 
 class AuthStore:
@@ -103,7 +124,9 @@ class AuthStore:
             if version < 1:
                 conn.executescript(_SCHEMA_USERS)
                 conn.executescript(_SCHEMA_SESSIONS)
-            # Future migrations become ordered `elif version < N:` steps.
+            if version < 2:
+                _add_missing_columns(conn, "users", _PROFILE_COLUMNS)
+            # Future migrations become ordered `if version < N:` steps.
             conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
 
     # ------------------------------------------------------------------ #
@@ -148,11 +171,51 @@ class AuthStore:
             ).fetchone()
         return _user_from_row(row)
 
-    def update_profile(self, user_id: str, full_name: str) -> User | None:
-        """Rename a profile (identity/email are never changeable here)."""
+    #: Optional free-text profile columns that :meth:`update_profile` may set.
+    _PROFILE_FIELDS = (
+        "profession",
+        "organization",
+        "country",
+        "research_interests",
+        "bio",
+    )
+
+    def update_profile(
+        self,
+        user_id: str,
+        full_name: str,
+        *,
+        profession: str | None = None,
+        organization: str | None = None,
+        country: str | None = None,
+        research_interests: str | None = None,
+        bio: str | None = None,
+    ) -> User | None:
+        """Update a profile (identity/email are never changeable here).
+
+        ``None`` leaves a field unchanged; an empty string clears it. Values
+        are expected to be validated by :class:`AuthService` before they reach
+        this method.
+        """
+        provided = {
+            "profession": profession,
+            "organization": organization,
+            "country": country,
+            "research_interests": research_interests,
+            "bio": bio,
+        }
+        assignments = ["full_name = ?"]
+        params: list[Any] = [full_name]
+        for name, value in provided.items():
+            if value is None:
+                continue
+            assignments.append(f"{name} = ?")
+            params.append(value)
+        params.append(user_id)
         with self._connect() as conn:
             conn.execute(
-                "UPDATE users SET full_name = ? WHERE id = ?", (full_name, user_id)
+                f"UPDATE users SET {', '.join(assignments)} WHERE id = ?",
+                tuple(params),
             )
         return self.get_user_by_id(user_id)
 
@@ -277,6 +340,12 @@ class AuthStore:
 def _user_from_row(row: Any) -> User | None:
     if row is None:
         return None
+    keys = row.keys()
+
+    def optional(name: str) -> str:
+        # Tolerate an older row shape (pre-v2) rather than raising.
+        return row[name] if name in keys else ""
+
     return User(
         id=row["id"],
         email=row["email"],
@@ -284,6 +353,11 @@ def _user_from_row(row: Any) -> User | None:
         password_hash=row["password_hash"],
         created_at=row["created_at"],
         last_login_at=row["last_login_at"],
+        profession=optional("profession"),
+        organization=optional("organization"),
+        country=optional("country"),
+        research_interests=optional("research_interests"),
+        bio=optional("bio"),
     )
 
 

@@ -26,6 +26,20 @@ class User:
     password_hash: str = field(repr=False)  # never render in logs/reprs
     created_at: str = ""
     last_login_at: str | None = None
+    # Optional professional profile. All empty until the user sets them; they
+    # are free text, trimmed and length-checked, and always escaped on render.
+    profession: str = ""
+    organization: str = ""
+    country: str = ""
+    research_interests: str = ""
+    bio: str = ""
+
+    @property
+    def has_profile_details(self) -> bool:
+        """True when any optional professional detail has been provided."""
+        return any(
+            (self.profession, self.organization, self.country, self.research_interests, self.bio)
+        )
 
 
 @dataclass

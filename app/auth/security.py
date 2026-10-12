@@ -40,6 +40,10 @@ _EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 MAX_NAME_LENGTH = 120
 MIN_NAME_LENGTH = 1
 
+#: Bounds for the optional, free-text professional profile fields.
+MAX_PROFILE_FIELD = 160
+MAX_PROFILE_BIO = 600
+
 
 def generate_token() -> str:
     """A new opaque session token (32 random bytes, URL-safe base64)."""
@@ -133,3 +137,15 @@ def validate_name(full_name: str) -> str:
     if len(value) > MAX_NAME_LENGTH:
         raise ValueError(f"Name must be at most {MAX_NAME_LENGTH} characters.")
     return value
+
+
+def validate_optional_field(value: str | None, label: str, max_length: int) -> str:
+    """Trim an optional profile field; raises ``ValueError`` when too long.
+
+    Empty is always allowed (it clears the field). No format is imposed - the
+    value is free text and is HTML-escaped wherever it is rendered.
+    """
+    text = (value or "").strip()
+    if len(text) > max_length:
+        raise ValueError(f"{label} must be at most {max_length} characters.")
+    return text

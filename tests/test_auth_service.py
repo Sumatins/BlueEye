@@ -203,6 +203,71 @@ def test_update_profile_renames_the_account(service: AuthService) -> None:
         service.update_profile(user.id, "   ")
 
 
+def test_update_profile_stores_professional_details(service: AuthService) -> None:
+    user = service.register("Ada", "ada@example.org", "secreT123")
+    updated = service.update_profile(
+        user.id,
+        "Ada Byron",
+        profession="  Marine biologist  ",
+        organization="Reef Research Institute",
+        country="India",
+        research_interests="coral reef fish",
+        bio="Surveys reef fish along the coast.",
+    )
+    assert updated.profession == "Marine biologist"  # trimmed
+    assert updated.organization == "Reef Research Institute"
+    assert updated.country == "India"
+    assert updated.research_interests == "coral reef fish"
+    assert updated.bio == "Surveys reef fish along the coast."
+    assert updated.has_profile_details is True
+
+    # None leaves a field unchanged; an empty string clears it.
+    cleared = service.update_profile(user.id, "Ada Byron", profession="")
+    assert cleared.profession == ""
+    assert cleared.organization == "Reef Research Institute"
+
+    with pytest.raises(AuthValidationError):
+        service.update_profile(user.id, "Ada Byron", bio="x" * 601)
+
+
+def test_schema_migration_adds_profile_columns(tmp_path: Path) -> None:
+    """Opening a pre-v2 database upgrades it in place without data loss."""
+    from app.auth.store import AuthStore
+
+    db = tmp_path / "legacy.db"
+    conn = sqlite3.connect(str(db))
+    conn.executescript(
+        "CREATE TABLE users ("
+        "id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, "
+        "full_name TEXT NOT NULL, password_hash TEXT NOT NULL, "
+        "created_at TEXT NOT NULL, last_login_at TEXT);"
+        "CREATE TABLE sessions ("
+        "id TEXT PRIMARY KEY, user_id TEXT NOT NULL, "
+        "token_digest TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, "
+        "expires_at TEXT NOT NULL, revoked_at TEXT, last_seen_at TEXT, "
+        "user_agent TEXT);"
+        "PRAGMA user_version=1;"
+        "INSERT INTO users (id, email, full_name, password_hash, created_at) "
+        "VALUES ('u1', 'ada@example.org', 'Ada', 'hash', "
+        "'2026-01-01T00:00:00+00:00');"
+    )
+    conn.commit()
+    conn.close()
+
+    store = AuthStore(db)
+    user = store.get_user_by_id("u1")
+    assert user is not None
+    assert user.full_name == "Ada"
+    assert user.profession == ""  # the new column defaulted cleanly
+    updated = store.update_profile("u1", "Ada Byron", profession="Biologist")
+    assert updated is not None
+    assert updated.profession == "Biologist"
+
+    check = sqlite3.connect(str(db))
+    assert check.execute("PRAGMA user_version").fetchone()[0] == 2
+    check.close()
+
+
 def test_change_password_keeps_current_session_and_retires_others(service: AuthService) -> None:
     service.register("Ada", "ada@example.org", "secreT123")
     user, token_a = service.login("ada@example.org", "secreT123")

@@ -29,6 +29,7 @@ from app.config import (
 from app.detection.detector import MarineDetector
 from app.detection.model_manager import ModelSpec
 from app.evaluation.experiments import EvaluationStore
+from app.evaluation.schedules import ScheduleStore
 from app.observations.builder import build_analysis
 from app.observations.models import Analysis, ObservationError
 from app.observations.store import ObservationStore
@@ -91,6 +92,17 @@ def get_evaluation_store(db_path: str) -> EvaluationStore:
 def evaluation_store(settings: Any) -> EvaluationStore:
     """The cached evaluation store for the current configuration."""
     return get_evaluation_store(str(settings.evaluation_db_path))
+
+
+@st.cache_resource(show_spinner=False)
+def get_schedule_store(db_path: str) -> ScheduleStore:
+    """One schedule store per database path (survives reruns/restarts)."""
+    return ScheduleStore(db_path)
+
+
+def schedule_store(settings: Any) -> ScheduleStore:
+    """The cached continuous-evaluation schedule store."""
+    return get_schedule_store(str(settings.evaluation_db_path))
 
 
 def evaluation_run_dir(settings: Any, user_id: str, experiment_id: str) -> Path:

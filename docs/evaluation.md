@@ -264,7 +264,7 @@ status.
 ## 8.1 Running it from the web UI
 
 The **Research Evaluation Center** page is the UI over this same pipeline. It is
-organised into four sections:
+organised into six sections:
 
 * **Run** — pick a discovered/registered dataset, the split, the models
   (showing task, classes, weights, device, compatibility and limitations; an
@@ -273,6 +273,15 @@ organised into four sections:
   are filled from the registry; the configuration is validated before the run
   starts. Each selected model runs **independently** and its scores are never
   merged.
+* **Schedules** — continuous evaluation. A saved schedule binds a dataset/split,
+  a set of models and a trigger (*on dataset / model change*, *on an interval*,
+  or *both*). While BlueEye is running a single background worker checks each
+  schedule; when one is due it launches an ordinary experiment with the same
+  code path above, records the fingerprints it actually used and never re-runs
+  an unchanged input. A stale `running` row (no live worker after a restart) is
+  marked failed so it cannot block the queue. A schedule whose dataset no longer
+  validates is reported as *blocked* and retried, never scored with missing
+  data. Every run is listed against the schedule, with best-mAP-over-time.
 * **Datasets** — register a dataset by explicit path or `data.yaml`, or use the
   auto-discovered ones; validate it and re-validate it on demand. Errors and
   warnings are listed separately, naming the affected file/class.
@@ -285,6 +294,33 @@ organised into four sections:
   When the experiments are not equivalent (different dataset fingerprint,
   split or class mapping) the comparison says so and only shows the differences
   that are actually valid; there is deliberately no universal “best".
+* **Export** — publication output built only from the stored measurements of
+  the experiments you select: headline and per-class tables as Markdown, LaTeX
+  (booktabs) and CSV, a dataset card per experiment, a provenance sheet
+  (evaluator recipe, parameters, model-weight fingerprints, environment) and a
+  single self-contained printable HTML report. A value that was not measured
+  stays empty; reference numbers from the literature are never mixed in.
+
+Per-account **Real-time settings** live on the **Account** page (not the
+Evaluation Center), because they control *your* worker behaviour rather than a
+single experiment. They are the same settings the worker reads, stored in the
+`schedule_preferences` table of the evaluation database:
+
+* **Run my schedules automatically** — the account's master switch. When off,
+  the background worker skips this account's schedules entirely (a manual check
+  still works).
+* **Check my datasets for changes every N seconds** — a per-account poll
+  interval (clamped to 5–3600 s). The worker checks an account no more often
+  than this, so a large interval trades responsiveness for less fingerprinting.
+  It is also bounded below by the process-wide worker tick
+  (`BLUEEYE_SCHEDULER_TICK`).
+* **Live status** — whether the worker thread is running and when it last
+  checked, reported from the real worker state.
+* **Check for changes now** — one immediate, forced pass over *your* enabled
+  schedules (`tick_once(..., only_user=…, force=True)`). It ignores the on/off
+  and poll gates for that single pass but never bypasses dataset validation or
+  the honesty rules: a schedule whose dataset is not ready is reported as
+  blocked, exactly as in an automatic tick.
 
 A run executes on a background thread and moves through
 `Configured → Validating → Queued/Running → Completed / Partially Completed /

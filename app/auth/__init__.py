@@ -28,7 +28,8 @@ from __future__ import annotations
 #: The database schema version understood by this code (see store._ensure_schema).
 #: Defined before the submodule imports below so that ``app.auth.store`` can
 #: import it without hitting a partially-initialised package.
-SCHEMA_VERSION = 1
+#: v2 adds the optional professional profile fields to ``users``.
+SCHEMA_VERSION = 2
 
 from app.auth.errors import (  # noqa: E402 - public error surface
     AuthError,

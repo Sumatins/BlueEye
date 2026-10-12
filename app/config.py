@@ -153,6 +153,13 @@ class Settings:
     #: granted to an explicitly configured reviewer. Never guessed or inferred.
     reviewer_emails: tuple[str, ...] = ()
 
+    # Continuous / scheduled evaluation (see app.evaluation.scheduler).
+    #: When enabled, a background worker re-runs *due* schedules while the
+    #: application process is alive. Set ``BLUEEYE_SCHEDULER=off`` to disable.
+    scheduler_enabled: bool = True
+    #: How often the worker checks for due schedules (seconds, floored at 5).
+    scheduler_tick_seconds: int = 20
+
     # Logging.
     log_level: str = "INFO"
 
@@ -332,6 +339,8 @@ def get_settings() -> Settings:
         session_ttl_days=_env_int("SESSION_TTL_DAYS", 7),
         password_min_length=_env_int("PASSWORD_MIN_LENGTH", 8),
         reviewer_emails=_env_list("REVIEWER_EMAILS", ()),
+        scheduler_enabled=_env_str("SCHEDULER", "on").lower() in {"on", "true", "1", "yes"},
+        scheduler_tick_seconds=max(5, _env_int("SCHEDULER_TICK", 20)),
         log_level=_env_str("LOG_LEVEL", "INFO").upper(),
     )
     get_settings._cache = settings  # type: ignore[attr-defined]

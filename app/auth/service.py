@@ -21,6 +21,8 @@ from app.auth.errors import (
 )
 from app.auth.models import Session, User
 from app.auth.security import (
+    MAX_PROFILE_BIO,
+    MAX_PROFILE_FIELD,
     dummy_verify,
     generate_token,
     hash_password,
@@ -28,6 +30,7 @@ from app.auth.security import (
     tokens_match,
     validate_email,
     validate_name,
+    validate_optional_field,
     validate_password,
     verify_password,
 )
@@ -158,13 +161,44 @@ class AuthService:
     # ------------------------------------------------------------------ #
     # Profile / account
     # ------------------------------------------------------------------ #
-    def update_profile(self, user_id: str, full_name: str) -> User:
-        """Rename the account belonging to ``user_id``."""
+    def update_profile(
+        self,
+        user_id: str,
+        full_name: str,
+        *,
+        profession: str | None = None,
+        organization: str | None = None,
+        country: str | None = None,
+        research_interests: str | None = None,
+        bio: str | None = None,
+    ) -> User:
+        """Update the display name and any provided profile fields.
+
+        ``None`` means "leave this field unchanged"; a string (including an
+        empty one) is validated and stored. Every value is trimmed and
+        length-checked here so the store only ever receives clean input.
+        """
         try:
             name = validate_name(full_name)
         except ValueError as exc:
             raise AuthValidationError(str(exc)) from exc
-        updated = self.store.update_profile(user_id, name)
+
+        cleaned: dict[str, str] = {}
+        for label, key, value, limit in (
+            ("Profession", "profession", profession, MAX_PROFILE_FIELD),
+            ("Organisation", "organization", organization, MAX_PROFILE_FIELD),
+            ("Country / region", "country", country, MAX_PROFILE_FIELD),
+            ("Research interests", "research_interests", research_interests, MAX_PROFILE_FIELD),
+            ("About", "bio", bio, MAX_PROFILE_BIO),
+        ):
+            if value is None:
+                continue
+            try:
+                cleaned[key] = validate_optional_field(value, label, limit)
+            except ValueError as exc:
+                raise AuthValidationError(str(exc)) from exc
+
+        updated = self.store.update_profile(user_id, name, **cleaned)
         if updated is None:
             raise AuthValidationError("Account not found.")
         return updated

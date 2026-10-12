@@ -102,6 +102,10 @@ dashboard with statistics and a machine-readable JSON report.
   pipeline: pick a locally prepared labelled dataset and split, run the
   unmodified detectors, and read real precision / recall / mAP@0.5 /
   mAP@0.5:0.95 with per-class tables, charts and JSON/CSV/Markdown downloads.
+  Also supports **continuous (scheduled) evaluation** — a saved schedule
+  re-runs when the dataset or the model weights change, on an interval, or
+  both — and a **publication export** (Markdown / LaTeX / CSV tables, dataset
+  cards, a provenance sheet and a printable report).
   When no labelled dataset is present it clearly reports the experiment as
   **pending** and never invents a score
 - **Downloadable results** — annotated image/video + JSON from the UI
@@ -329,7 +333,7 @@ Open http://localhost:8501 and use the sidebar navigation:
 | **Models** | The single source of truth: grouped into *Ready and verified* / *Downloadable but not yet verified* / *Unavailable or incompatible*, with architecture, runtime, classes, licence, image/video verification, limitations and an inference check; download weights |
 | **Analytics** | Charts computed from your stored detections (top species, confidence distribution) |
 | **Model Comparison** | Run several installed models on one image and compare their real detections, confidences and timing side by side |
-| **Research Evaluation** | Run the reproducible evaluation pipeline over a labelled dataset: real precision / recall / mAP with per-class tables, charts and exports; stays *pending* without a dataset |
+| **Research Evaluation** | Run the reproducible evaluation pipeline over a labelled dataset: real precision / recall / mAP with per-class tables, charts and exports; schedule continuous re-runs on dataset/model change or an interval; export paper-ready Markdown / LaTeX / CSV tables, dataset cards, provenance and a printable report; stays *pending* without a dataset |
 | **History** | Every finished run with inputs, models, thresholds and outputs; search, filter, re-open, delete a run and export (CSV / research summary) |
 | **About** | What BlueEye does, how it works, limitations and attribution |
 
@@ -432,6 +436,17 @@ server-verified session — nothing is trusted from the browser.
   History, Analytics, Model Comparison, Research Evaluation and Account require
   a signed-in user. Species Explorer, AI Models, About and Help stay public
   (with a sign-in prompt).
+- **Account page** — private to the signed-in user and made of three parts:
+  an editable **profile** (full name plus optional professional details:
+  profession/role, organisation/affiliation, country/region, research interests
+  and a short "about"), **real-time settings** for the continuous-evaluation
+  worker (run-my-schedules-automatically, a check interval, live worker status
+  and a "check for changes now" action — see
+  [Evaluation Center → Real-time settings](docs/evaluation.md)), and **active
+  sessions** (list and revoke devices). Profile fields are trimmed,
+  length-checked and HTML-escaped on render. Changing a password is still
+  available in the backend (`AuthService.change_password`); the Account page no
+  longer hosts the password form.
 - **Per-account data** — detection history, uploads, annotated outputs and JSON
   reports are stored under per-account directories
   (`outputs/history/users/<user_id>/`, `data/input/<user_id>/`, …). The user id

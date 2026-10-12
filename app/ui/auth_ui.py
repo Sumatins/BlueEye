@@ -7,7 +7,8 @@ Responsibilities
 * The sign-in / create-account gate shown to anonymous visitors on private
   pages (and the guest banner on public pages).
 * The sidebar account block (who is signed in / sign out).
-* The Account page (profile, password change, session management).
+* The Account page (professional profile, real-time worker settings and
+  session management).
 
 Security model
 --------------
@@ -44,6 +45,8 @@ from app.auth import (
 )
 from app.auth.models import User
 from app.auth.security import hash_token
+from app.evaluation import scheduler as eval_scheduler
+from app.evaluation.schedules import MAX_POLL_SECONDS, MIN_POLL_SECONDS
 from app.ui import state
 from app.ui.components import badge, hero, notice, section_title
 from app.ui.icons import span
@@ -402,9 +405,9 @@ def render_guest_banner() -> None:
 # --------------------------------------------------------------------------- #
 # Account page (profile + sessions)
 # --------------------------------------------------------------------------- #
-def render_account(settings: Any, user: User | None) -> None:
-    """Private Account page: identity, profile updates, password change and
-    session management."""
+def render_account(settings: Any, user: User | None, detector: Any = None) -> None:
+    """Private Account page: identity, professional profile, real-time worker
+    settings and session management."""
     if user is None:
         render_gate()
         return
@@ -413,19 +416,20 @@ def render_account(settings: Any, user: User | None) -> None:
         st,
         "Private to your account",
         "Account",
-        "Your identity, password and active sessions.",
+        "Your identity, professional profile, real-time settings and active "
+        "sessions.",
         icon="account_circle",
     )
     _consume_revocation_warning()
     _consume_flash()
 
     _profile_section(user)
-    _password_section(settings, user)
+    _settings_section(settings, user, detector)
     _sessions_section(user)
 
 
 def _profile_section(user: User) -> None:
-    """Identity overview + profile edit form.
+    """Identity overview + professional profile edit form.
 
     Only user-facing account fields are shown. Internal implementation
     details (database paths, account ids, hashes, tokens) are never rendered.
@@ -437,6 +441,9 @@ def _profile_section(user: User) -> None:
         + _info_card("badge", "Account status", badge("Active", "ok", dot=True))
         + _info_card("calendar_month", "Member since", esc(_fmt_date(user.created_at)))
         + _info_card("login", "Last sign-in", esc(_fmt_ts(user.last_login_at)))
+        + _info_card("work", "Profession", esc(user.profession or "Not set"))
+        + _info_card("corporate_fare", "Organisation", esc(user.organization or "Not set"))
+        + _info_card("public", "Country / region", esc(user.country or "Not set"))
         + "</div>",
         unsafe_allow_html=True,
     )
@@ -444,8 +451,8 @@ def _profile_section(user: User) -> None:
     with st.container(border=True):
         section_title(st, "Edit profile")
         st.caption(
-            "Update the name shown across BlueEye. Your email address "
-            "identifies your account and cannot be changed here."
+            "Update the professional details shown across BlueEye. Your email "
+            "address identifies your account and cannot be changed here."
         )
         name_input = st.text_input(
             "Full name",
@@ -453,9 +460,60 @@ def _profile_section(user: User) -> None:
             key="acct_name",
             max_chars=120,
         )
+        left, right = st.columns(2)
+        with left:
+            profession_input = st.text_input(
+                "Profession / role",
+                value=user.profession,
+                key="acct_profession",
+                max_chars=160,
+                placeholder="e.g. Marine biologist, student, educator",
+            )
+            country_input = st.text_input(
+                "Country / region",
+                value=user.country,
+                key="acct_country",
+                max_chars=160,
+                placeholder="e.g. India, Bay of Bengal coast",
+            )
+        with right:
+            organization_input = st.text_input(
+                "Organisation / affiliation",
+                value=user.organization,
+                key="acct_organization",
+                max_chars=160,
+                placeholder="e.g. Reef Research Institute",
+            )
+            interests_input = st.text_input(
+                "Research interests",
+                value=user.research_interests,
+                key="acct_interests",
+                max_chars=160,
+                placeholder="e.g. coral reef fish surveys",
+            )
+        bio_input = st.text_area(
+            "About",
+            value=user.bio,
+            key="acct_bio",
+            max_chars=600,
+            height=120,
+            placeholder="A short note about your work or how you use BlueEye.",
+        )
+        st.caption(
+            "Every field is optional and private to your account. Leave one "
+            "blank to clear it."
+        )
         if st.button("Save changes", key="acct_save_name", icon=":material/save:"):
             try:
-                _service().update_profile(user.id, name_input)
+                _service().update_profile(
+                    user.id,
+                    name_input,
+                    profession=profession_input,
+                    organization=organization_input,
+                    country=country_input,
+                    research_interests=interests_input,
+                    bio=bio_input,
+                )
             except AuthValidationError as exc:
                 st.error(str(exc))
             except Exception:  # noqa: BLE001
@@ -466,53 +524,116 @@ def _profile_section(user: User) -> None:
                 st.rerun()
 
 
-def _password_section(settings: Any, user: User) -> None:
-    """Change-password form.
+def _settings_section(settings: Any, user: User, detector: Any) -> None:
+    """Real-time settings: the per-account continuous-evaluation controls.
 
-    The current password is verified server-side and the new one is validated
-    and bcrypt-hashed before it is stored; on success the account's *other*
-    devices are signed out. This device stays signed in.
+    These are the *same* settings the background worker reads, so a change is
+    honoured on the next check, and "Check for changes now" runs a real pass
+    immediately. Nothing here is simulated.
     """
-    section_title(st, "Password", "Change the password you sign in with.")
+    section_title(
+        st,
+        "Real-time settings",
+        "How BlueEye keeps your research evaluations running in the background.",
+    )
+    if settings is None:
+        st.caption("Settings are unavailable in this session.")
+        return
+
+    sched_store = state.schedule_store(settings)
+    prefs = sched_store.get_preferences(user.id)
+    status = eval_scheduler.status()
+
     with st.container(border=True):
-        current_pw = st.text_input(
-            "Current password", type="password", key="acct_pw_current"
+        if status["running"]:
+            st.markdown(
+                badge("Worker running", "ok", dot=True)
+                + f" Last check: {esc(status['last_tick'] or 'starting...')}.",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                badge("Worker idle", "warn", dot=True)
+                + " It starts automatically on your next visit.",
+                unsafe_allow_html=True,
+            )
+        st.caption(status["summary"])
+
+        enabled = st.toggle(
+            "Run my schedules automatically",
+            value=prefs.enabled,
+            key="acct_continuous_enabled",
+            help="When off, your saved schedules are paused and no run starts "
+            "on its own. A manual check still works.",
         )
-        new_pw = st.text_input(
-            "New password",
-            type="password",
-            key="acct_pw_new",
-            help=f"At least {settings.password_min_length} characters with "
-            "a letter and a number.",
-        )
-        confirm_pw = st.text_input(
-            "Confirm new password", type="password", key="acct_pw_confirm"
+        max_display = min(MAX_POLL_SECONDS, 600)
+        poll = st.slider(
+            "Check my datasets for changes every (seconds)",
+            min_value=MIN_POLL_SECONDS,
+            max_value=max_display,
+            value=max(MIN_POLL_SECONDS, min(int(prefs.poll_seconds), max_display)),
+            step=5,
+            key="acct_continuous_poll",
+            help="Lower is more responsive. BlueEye never checks your account "
+            "more often than this.",
         )
         st.caption(
-            f"Minimum {settings.password_min_length} characters, including at "
-            "least one letter and one number. Changing your password signs out "
-            "every other device."
+            "These settings apply to your account only. The schedules "
+            "themselves live in **Research Evaluation → Schedules**."
         )
-        if st.button("Change password", key="acct_pw_change", icon=":material/key:"):
-            try:
-                _service().change_password(
-                    user.id,
-                    current_pw,
-                    new_pw,
-                    confirm_pw,
-                    keep_token_digest=_current_digest(),
-                )
-            except (AuthValidationError, InvalidCredentialsError) as exc:
-                st.error(str(exc))
-            except Exception:  # noqa: BLE001
-                logger.exception("Password change failed")
-                st.error("Could not change your password right now. Please try again.")
-            else:
-                _flash(
-                    "success",
-                    "Your password was changed. Other devices were signed out.",
-                )
-                st.rerun()
+
+        left, right = st.columns(2)
+        with left:
+            save = st.button(
+                "Save settings", key="acct_save_settings", icon=":material/save:"
+            )
+        with right:
+            check = st.button(
+                "Check for changes now",
+                key="acct_check_now",
+                icon=":material/refresh:",
+            )
+
+        if save:
+            sched_store.set_preferences(user.id, enabled=enabled, poll_seconds=poll)
+            _flash("success", "Real-time settings saved.")
+            st.rerun()
+        if check:
+            _check_now(settings, detector, user, sched_store)
+
+
+def _check_now(settings: Any, detector: Any, user: User, sched_store: Any) -> None:
+    """Run one immediate, real pass over this account's schedules."""
+    if detector is None:
+        _flash("error", "The detector is not ready in this session.")
+        st.rerun()
+        return
+    try:
+        result = eval_scheduler.tick_once(
+            settings,
+            detector,
+            sched_store=sched_store,
+            only_user=user.id,
+            force=True,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("Manual real-time check failed")
+        _flash("error", "Could not run a check right now. Please try again.")
+        st.rerun()
+        return
+
+    if result.started:
+        _flash(
+            "success",
+            f"Started {len(result.started)} scheduled run(s).",
+        )
+    elif result.blocked:
+        _flash("warning", "A schedule could not run: " + result.blocked[0]["reason"])
+    elif result.checked == 0:
+        _flash("info", "You have no enabled schedules to check yet.")
+    else:
+        _flash("info", "No schedule was due right now.")
+    st.rerun()
 
 
 def _sessions_section(user: User) -> None:

@@ -8,7 +8,11 @@ as ``scripts/run_evaluation.py``. It lets an authenticated user:
 * select compatible, installed models and configure a real run;
 * execute the run in the background, watch its lifecycle and, if needed,
   cancel it;
+* keep a dataset/model pair under **continuous evaluation** - a schedule
+  re-runs when the dataset or the weights change, on an interval, or both;
 * inspect genuinely measured metrics, per-class results and real plots;
+* export publication-ready Markdown / LaTeX / CSV tables, dataset cards, a
+  provenance sheet and a self-contained printable report;
 * revisit, compare and export experiments after a restart.
 
 Honesty rules enforced here
@@ -25,6 +29,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from dataclasses import dataclass
@@ -32,6 +37,7 @@ from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from app.detection.detector import MarineDetector
 from app.evaluation.compat import compare_classes
@@ -59,6 +65,20 @@ from app.evaluation.jobs import (
     request_cancel,
     start_experiment,
 )
+from app.evaluation import scheduler as eval_scheduler
+from app.evaluation.publication import (
+    HEADLINE_COLUMNS,
+    PER_CLASS_COLUMNS,
+    build_bundle,
+    headline_rows,
+    per_class_rows,
+    render_html as render_publication_html,
+)
+from app.evaluation.schedules import (
+    MAX_INTERVAL_MINUTES,
+    MIN_INTERVAL_MINUTES,
+    TRIGGER_LABELS,
+)
 from app.evaluation.validation import (
     DatasetValidation,
     DatasetValidationError,
@@ -81,7 +101,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_LIMIT = 25
 
 #: Top-level sections of the research workspace.
-SECTIONS = ("Run", "Experiments", "Datasets", "Compare")
+SECTIONS = ("Run", "Experiments", "Schedules", "Datasets", "Compare", "Export")
 
 #: Badge kind for each experiment status.
 _STATUS_KIND = {
@@ -135,7 +155,7 @@ def render(detector: MarineDetector, settings, user=None) -> None:
     user_id = user.id
     store = state.evaluation_store(settings)
 
-    _overview(store, user_id)
+    _overview(settings, store, user_id)
 
     goto = st.session_state.pop("eval_goto", None)
     if goto in SECTIONS:
@@ -154,8 +174,12 @@ def render(detector: MarineDetector, settings, user=None) -> None:
         _run_section(detector, settings, store, user_id)
     elif section == "Experiments":
         _experiments_section(settings, store, user_id)
+    elif section == "Schedules":
+        _schedules_section(detector, settings, store, user_id)
     elif section == "Datasets":
         _datasets_section(settings, store, user_id)
+    elif section == "Export":
+        _export_section(settings, store, user_id)
     else:
         _compare_section(settings, store, user_id)
 
@@ -163,7 +187,7 @@ def render(detector: MarineDetector, settings, user=None) -> None:
 # --------------------------------------------------------------------------- #
 # Overview
 # --------------------------------------------------------------------------- #
-def _overview(store: EvaluationStore, user_id: str) -> None:
+def _overview(settings, store: EvaluationStore, user_id: str) -> None:
     stats = store.stats(user_id)
     metrics_row(
         st,
@@ -185,6 +209,8 @@ def _overview(store: EvaluationStore, user_id: str) -> None:
             "No experiment has completed yet. Configure a dataset and run one "
             "to produce the first real result set."
         )
+
+    _scheduler_caption(settings)
 
     columns = st.columns(3)
     with columns[0]:
@@ -211,6 +237,24 @@ def _overview(store: EvaluationStore, user_id: str) -> None:
             width="stretch",
         ):
             st.session_state["eval_goto"] = "Compare"
+
+    columns2 = st.columns(2)
+    with columns2[0]:
+        if st.button(
+            "Schedule continuous evaluation",
+            icon=":material/autorenew:",
+            key="eval_goto_schedules",
+            width="stretch",
+        ):
+            st.session_state["eval_goto"] = "Schedules"
+    with columns2[1]:
+        if st.button(
+            "Export tables for a paper",
+            icon=":material/table_view:",
+            key="eval_goto_export",
+            width="stretch",
+        ):
+            st.session_state["eval_goto"] = "Export"
 
 
 # --------------------------------------------------------------------------- #
@@ -1134,6 +1178,515 @@ def _rerun_command(record) -> str:
         f"--split {record.split or 'test'} --model {model_arg} "
         f"--record --owner {record.user_id}"
     )
+
+
+# --------------------------------------------------------------------------- #
+# Continuous / scheduled evaluation
+# --------------------------------------------------------------------------- #
+def _scheduler_caption(settings) -> None:
+    """One honest line about the background worker in the overview."""
+    if not getattr(settings, "scheduler_enabled", True):
+        st.caption(
+            "Continuous evaluation worker: **disabled** "
+            "(`BLUEEYE_SCHEDULER=off`). Schedules still run when you start them."
+        )
+        return
+    status = eval_scheduler.status()
+    if status["running"]:
+        st.caption(
+            f"Continuous evaluation worker: **running** · last check "
+            f"{status['last_tick'] or 'starting...'} · {status['summary']}"
+        )
+    else:
+        st.caption(
+            "Continuous evaluation worker: **starting** - add a schedule to keep "
+            "a dataset and model pair under evaluation."
+        )
+
+
+def _schedules_section(
+    detector: MarineDetector, settings, store: EvaluationStore, user_id: str
+) -> None:
+    st.markdown("### Continuous research evaluation")
+    notice(
+        st,
+        "info",
+        "Re-run automatically, and record the history",
+        "A schedule re-runs a real evaluation while BlueEye is running: when the "
+        "dataset or the model weights change, on a fixed interval, or both. Every "
+        "run is an ordinary experiment with full provenance - nothing here is "
+        "simulated, and a change is only ever detected from the real files on disk.",
+        icon="autorenew",
+    )
+    _scheduler_caption(settings)
+
+    sched_store = state.schedule_store(settings)
+    options = _dataset_options(settings, store, user_id)
+    available = state.available_keys(detector)
+    registry = state.registry(detector)
+
+    if not options:
+        _pending_state(settings)
+    elif not available:
+        _weights_notice()
+    else:
+        _schedule_builder(
+            detector, settings, store, sched_store, user_id, options, available, registry
+        )
+
+    st.markdown("### Saved schedules")
+    schedules = sched_store.list(user_id)
+    if not schedules:
+        empty_state(
+            st,
+            "autorenew",
+            "No schedules yet",
+            "Create one above to keep a dataset and model pair under continuous "
+            "evaluation and build a history of measurements over time.",
+        )
+        return
+    for schedule in schedules:
+        _schedule_card(detector, settings, store, sched_store, user_id, schedule)
+
+
+def _schedule_builder(
+    detector,
+    settings,
+    store: EvaluationStore,
+    sched_store,
+    user_id: str,
+    options: list,
+    available: list[str],
+    registry: dict,
+) -> None:
+    """Form that saves a new schedule (validated before it is stored)."""
+    with st.expander("Create a schedule", expanded=False):
+        labels = {
+            str(option.data_yaml): (
+                f"{option.name} · {len(option.class_names)} classes · {option.source}"
+            )
+            for option in options
+        }
+        name = st.text_input(
+            "Schedule name",
+            value=f"Continuous evaluation {datetime.now():%Y-%m-%d}",
+            key="sched_name",
+        )
+        left, right = st.columns([2, 1])
+        with left:
+            dataset_key = st.selectbox(
+                "Dataset",
+                options=list(labels),
+                format_func=lambda key: labels.get(key, key),
+                key="sched_dataset",
+            )
+        option = next(item for item in options if str(item.data_yaml) == dataset_key)
+        splits = list(available_splits(option.data_yaml) or option.splits or ())
+        if not splits:
+            splits = ["test"]
+        with right:
+            split = st.selectbox(
+                "Split",
+                options=splits,
+                index=(splits.index("test") if "test" in splits else 0),
+                key="sched_split",
+            )
+
+        selections = st.multiselect(
+            "Models to evaluate",
+            options=available,
+            default=available[: min(2, len(available))],
+            format_func=lambda key: state.model_label(key, registry.get(key), True),
+            key="sched_models",
+        )
+
+        modes = list(TRIGGER_LABELS)
+        mode = st.radio(
+            "When to run",
+            options=modes,
+            format_func=lambda value: TRIGGER_LABELS[value],
+            horizontal=True,
+            key="sched_mode",
+        )
+        interval = st.number_input(
+            "Interval (minutes)",
+            min_value=MIN_INTERVAL_MINUTES,
+            max_value=MAX_INTERVAL_MINUTES,
+            value=60,
+            step=15,
+            disabled=(mode == "on_change"),
+            key="sched_interval",
+            help="Used by the 'interval' and 'both' triggers.",
+        )
+
+        c1, c2 = st.columns(2)
+        with c1:
+            use_default = st.checkbox(
+                "Use each model's recommended threshold",
+                value=True,
+                key="sched_default",
+            )
+        with c2:
+            confidence = st.slider(
+                "Confidence override",
+                min_value=0.01,
+                max_value=0.99,
+                value=0.5,
+                step=0.01,
+                disabled=use_default,
+                key="sched_conf",
+            )
+        c3, c4 = st.columns(2)
+        with c3:
+            limit = st.number_input(
+                "Max images per run (0 = all)",
+                min_value=0,
+                max_value=1_000_000,
+                value=DEFAULT_LIMIT,
+                step=5,
+                key="sched_limit",
+            )
+        with c4:
+            plots = st.checkbox(
+                "Write plots on every run",
+                value=True,
+                key="sched_plots",
+            )
+        purpose = st.text_input(
+            "Research purpose / question (optional)",
+            key="sched_purpose",
+            placeholder="e.g. watch recall as the dataset grows",
+        )
+
+        if st.button(
+            "Save schedule",
+            type="primary",
+            icon=":material/add_alarm:",
+            key="sched_create",
+        ):
+            if not selections:
+                error_card(st, "Select at least one model", "Pick one or more models.")
+                return
+            try:
+                validation = validate_dataset(option.data_yaml, split=split)
+            except DatasetValidationError as exc:
+                error_card(st, "Dataset config could not be read", str(exc))
+                return
+            if not validation.ready:
+                error_card(
+                    st,
+                    "Dataset is not ready",
+                    "BlueEye will not schedule a dataset it cannot validate. "
+                    "Resolve the issues in the Datasets section and try again.",
+                )
+                return
+
+            parameters = {
+                "confidence": None if use_default else float(confidence),
+                "use_recommended_threshold": use_default,
+                "iou_threshold_for_figures": 0.5,
+                "max_images": int(limit or 0),
+                "plots": bool(plots),
+                "purpose": purpose.strip(),
+                "device": str(getattr(detector, "device", "") or "auto"),
+            }
+            sched_store.create(
+                user_id,
+                name.strip() or f"Continuous evaluation {datetime.now():%Y-%m-%d}",
+                option.data_yaml,
+                dataset_name=option.name,
+                split=split,
+                class_names=validation.class_names,
+                model_keys=tuple(selections),
+                parameters=parameters,
+                trigger_mode=mode,
+                interval_minutes=int(interval),
+            )
+            st.success(
+                "Schedule saved. It runs on the next worker check "
+                f"({settings.scheduler_tick_seconds}s) when it is due."
+            )
+            st.rerun()
+
+
+def _schedule_card(
+    detector: MarineDetector,
+    settings,
+    store: EvaluationStore,
+    sched_store,
+    user_id: str,
+    schedule,
+) -> None:
+    with st.container(border=True):
+        head = st.columns([4, 1, 1])
+        with head[0]:
+            kind = {
+                "completed": "ok",
+                "failed": "error",
+                "blocked": "warn",
+                "queued": "warn",
+                "running": "warn",
+            }.get(schedule.last_status, "info")
+            last_label = schedule.last_status or "never run"
+            st.markdown(
+                badge(last_label, kind, dot=True) + f" **{schedule.name}**",
+                unsafe_allow_html=True,
+            )
+            st.caption(
+                f"{schedule.dataset_name or Path(schedule.data_yaml).name} · split "
+                f"`{schedule.split}` · models: {', '.join(schedule.model_keys) or 'none'}"
+            )
+            trigger = schedule.trigger_label
+            if schedule.trigger_mode in ("interval", "both"):
+                trigger += f" · every {schedule.interval_minutes} min"
+            st.caption(f"Trigger: {trigger} · {schedule.next_due_hint()}")
+            st.caption(
+                f"Last run: {schedule.last_run_at or 'never'} · "
+                f"{schedule.run_count} run(s) recorded"
+            )
+        with head[1]:
+            enabled = st.toggle(
+                "Enabled",
+                value=schedule.enabled,
+                key=f"sched_enabled_{schedule.id}",
+                help="A disabled schedule is ignored by the worker.",
+            )
+            if enabled != schedule.enabled:
+                sched_store.set_enabled(schedule.id, user_id, enabled)
+                st.rerun()
+        with head[2]:
+            if st.button(
+                "Run now",
+                key=f"sched_run_{schedule.id}",
+                icon=":material/play_arrow:",
+                width="stretch",
+            ):
+                _run_schedule_now(detector, settings, store, sched_store, schedule)
+
+        _schedule_history(settings, store, sched_store, user_id, schedule)
+
+
+def _run_schedule_now(
+    detector, settings, store: EvaluationStore, sched_store, schedule
+) -> None:
+    dataset_fp = eval_scheduler.compute_dataset_fingerprint(schedule.data_yaml)
+    model_fps = eval_scheduler.compute_model_fingerprints(
+        detector, schedule.model_keys
+    )
+    try:
+        experiment_id = eval_scheduler.start_scheduled_run(
+            store=store,
+            settings=settings,
+            sched_store=sched_store,
+            schedule=schedule,
+            detector=detector,
+            trigger="manual",
+            dataset_fingerprint=dataset_fp,
+            model_fingerprints=model_fps,
+        )
+    except eval_scheduler.ScheduleRunError as exc:
+        error_card(st, "Could not start the scheduled run", str(exc))
+        return
+    st.success(
+        f"Started experiment `{experiment_id}` for schedule '{schedule.name}'."
+    )
+    st.rerun()
+
+
+def _schedule_history(settings, store: EvaluationStore, sched_store, user_id, schedule) -> None:
+    """Results over time for this schedule (real runs only)."""
+    with st.expander(f"History · {schedule.run_count} run(s)"):
+        experiments = store.list_experiments(user_id, limit=200)
+        runs = [
+            record
+            for record in experiments
+            if (record.parameters or {}).get("schedule_id") == schedule.id
+        ]
+        if not runs:
+            st.caption(
+                "No run has been recorded for this schedule yet. Use 'Run now' or "
+                "wait for the worker to detect a change."
+            )
+        else:
+            table = []
+            points: list[float] = []
+            for record in reversed(runs):
+                best = record.mAP50
+                table.append(
+                    {
+                        "created": record.created_at,
+                        "status": record.status,
+                        "trigger": (record.parameters or {}).get("trigger", ""),
+                        "models": ", ".join(record.model_keys),
+                        "mAP@0.5": f"{best:.4f}" if isinstance(best, (int, float)) else "n/a",
+                        "experiment": record.id,
+                    }
+                )
+                if isinstance(best, (int, float)):
+                    points.append(float(best))
+            st.dataframe(table, hide_index=True, width="stretch")
+            if len(points) >= 2:
+                st.caption("Best mAP@0.5 per recorded run (real measurements only).")
+                st.line_chart(
+                    {"run": list(range(1, len(points) + 1)), "mAP@0.5": points},
+                    x="run",
+                    y="mAP@0.5",
+                )
+            else:
+                st.caption(
+                    "A trend line appears once two runs with measured mAP are recorded."
+                )
+
+        confirm = st.checkbox(
+            "I understand this deletes the schedule (not its experiments)",
+            key=f"sched_confirm_delete_{schedule.id}",
+        )
+        if st.button(
+            "Delete schedule",
+            key=f"sched_delete_{schedule.id}",
+            disabled=not confirm,
+        ):
+            sched_store.delete(schedule.id, user_id)
+            st.rerun()
+
+
+# --------------------------------------------------------------------------- #
+# Publication export
+# --------------------------------------------------------------------------- #
+_PUBLICATION_MIME = {
+    ".csv": "text/csv",
+    ".md": "text/markdown",
+    ".tex": "text/plain",
+    ".html": "text/html",
+}
+
+
+def _export_cell(key: str, value) -> str:
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        return f"{value:.4f}"
+    return str(value)
+
+
+def _export_section(settings, store: EvaluationStore, user_id: str) -> None:
+    st.markdown("### Publication export")
+    notice(
+        st,
+        "info",
+        "Paper-ready tables, straight from the measurements",
+        "Every table is generated from the experiments you select - the same "
+        "numbers the workspace shows. Reference values from the literature are "
+        "never mixed in, and a value that was not measured stays empty.",
+        icon="table_view",
+    )
+
+    with_results = [
+        record
+        for record in store.list_experiments(user_id, limit=200)
+        if record.results
+    ]
+    if not with_results:
+        empty_state(
+            st,
+            "table_view",
+            "Nothing to export yet",
+            "Run or schedule an evaluation first; export needs at least one "
+            "experiment with measured results.",
+        )
+        return
+
+    labels = {
+        record.id: (
+            f"{record.name} · {record.status} · {len(record.results)} model(s) · "
+            f"{record.created_at}"
+        )
+        for record in with_results
+    }
+    chosen = st.multiselect(
+        "Experiments to include",
+        options=list(labels),
+        default=[with_results[0].id],
+        format_func=lambda key: labels.get(key, key),
+        key="export_experiments",
+    )
+    if not chosen:
+        st.caption("Select at least one experiment to build the tables.")
+        return
+
+    selected = [record for record in with_results if record.id in set(chosen)]
+    rows = headline_rows(selected)
+
+    st.markdown("#### Headline metrics preview")
+    st.dataframe(
+        [
+            {label: _export_cell(key, row.get(key, "")) for key, label, _ in HEADLINE_COLUMNS}
+            for row in rows
+        ],
+        hide_index=True,
+        width="stretch",
+    )
+
+    per_class = per_class_rows(selected)
+    if per_class:
+        with st.expander(f"Per-class metrics preview ({len(per_class)} rows)"):
+            st.dataframe(
+                [
+                    {
+                        label: _export_cell(key, row.get(key, ""))
+                        for key, label, _ in PER_CLASS_COLUMNS
+                    }
+                    for row in per_class
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+
+    key = hashlib.sha256(",".join(sorted(chosen)).encode("utf-8")).hexdigest()[:10]
+    bundle_dir = settings.outputs_dir / "evaluation" / user_id / "publication" / key
+
+    if st.button(
+        "Prepare publication bundle",
+        type="primary",
+        icon=":material/download:",
+        key="export_prepare",
+    ):
+        written = build_bundle(selected, bundle_dir)
+        st.session_state["eval_export_bundle"] = {
+            "dir": str(bundle_dir),
+            "ids": tuple(sorted(chosen)),
+        }
+        st.success(f"Wrote {len(written)} file(s) to `{bundle_dir}`.")
+
+    bundle = st.session_state.get("eval_export_bundle")
+    if not bundle or tuple(bundle.get("ids", ())) != tuple(sorted(chosen)):
+        st.caption(
+            "Choose the experiments, then prepare the bundle to download the "
+            "Markdown, LaTeX, CSV, dataset cards, provenance sheet and a printable "
+            "HTML report."
+        )
+        return
+
+    written = build_bundle(selected, Path(bundle["dir"]))
+    st.markdown("#### Downloads")
+    columns = st.columns(3)
+    for index, (name, path) in enumerate(sorted(written.items())):
+        with columns[index % 3]:
+            download_button(
+                st,
+                name,
+                path,
+                _PUBLICATION_MIME.get(path.suffix.lower(), "application/octet-stream"),
+                icon=":material/download:",
+            )
+    st.caption(f"Bundle directory: `{bundle['dir']}`")
+
+    with st.expander("Preview the printable report", expanded=False):
+        components.html(
+            render_publication_html(selected), height=720, scrolling=True
+        )
 
 
 # --------------------------------------------------------------------------- #

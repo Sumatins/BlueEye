@@ -28,6 +28,9 @@ def app_env(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("BLUEEYE_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("BLUEEYE_OUTPUTS_DIR", str(tmp_path / "outputs"))
     monkeypatch.setenv("BLUEEYE_MODELS_DIR", str(tmp_path / "models"))
+    # Keep the continuous worker out of the UI tests: scheduling is exercised
+    # directly in tests/test_continuous_evaluation.py.
+    monkeypatch.setenv("BLUEEYE_SCHEDULER", "off")
     reset_settings_cache()
     st.cache_resource.clear()
     yield tmp_path
@@ -114,7 +117,7 @@ def test_all_evaluation_sections_render(app_env) -> None:
     _seed_stored_run(user_id, "Owned Model", "Owned Model")
     at = _goto(at, "evaluation")
 
-    for section in ("Run", "Experiments", "Datasets", "Compare"):
+    for section in ("Run", "Experiments", "Schedules", "Datasets", "Compare", "Export"):
         _by_key(at.radio, "eval_section").set_value(section)
         at = at.run()
         assert not at.exception, (section, at.exception)
@@ -136,6 +139,58 @@ def test_compare_section_offers_a_comparison_export(app_env) -> None:
         getattr(element, "label", "") for element in at.get("download_button")
     ]
     assert any("comparison" in label.lower() for label in download_labels)
+
+
+def test_schedules_section_lists_a_saved_schedule(app_env) -> None:
+    at = _register(_app("evaluation"))
+    user_id = at.session_state["be_auth_user_id"]
+    _seed_schedule(user_id, "Reef watch")
+    at = _goto(at, "evaluation")
+    _by_key(at.radio, "eval_section").set_value("Schedules")
+    at = at.run()
+
+    assert not at.exception, at.exception
+    assert "Reef watch" in _rendered_text(at)
+
+
+def test_export_section_builds_a_publication_bundle(app_env) -> None:
+    at = _register(_app("evaluation"))
+    user_id = at.session_state["be_auth_user_id"]
+    _seed_stored_run(user_id, "Paper run", "Paper run")
+    at = _goto(at, "evaluation")
+    _by_key(at.radio, "eval_section").set_value("Export")
+    at = at.run()
+
+    assert not at.exception, at.exception
+    assert "Paper run" in _rendered_text(at)
+
+    _by_key(at.button, "export_prepare").click()
+    at = at.run()
+
+    assert not at.exception, at.exception
+    download_labels = [
+        getattr(element, "label", "") for element in at.get("download_button")
+    ]
+    assert any("publication_metrics.csv" in label for label in download_labels)
+    assert any("publication_report.html" in label for label in download_labels)
+
+
+def _seed_schedule(user_id: str, name: str) -> str:
+    """Save one schedule row for the account (no run is started)."""
+    from app.evaluation.schedules import ScheduleStore
+
+    store = ScheduleStore(get_settings().evaluation_db_path)
+    return store.create(
+        user_id,
+        name,
+        "tiny/data.yaml",
+        dataset_name="tiny",
+        split="test",
+        class_names=("scaridae",),
+        model_keys=("fish_inv",),
+        trigger_mode="on_change",
+        interval_minutes=60,
+    ).id
 
 
 # --------------------------------------------------------------------------- #

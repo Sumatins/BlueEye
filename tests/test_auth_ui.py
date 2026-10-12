@@ -39,6 +39,9 @@ def app_env(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("BLUEEYE_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("BLUEEYE_OUTPUTS_DIR", str(tmp_path / "outputs"))
     monkeypatch.setenv("BLUEEYE_MODELS_DIR", str(tmp_path / "models"))
+    # Keep the background worker out of these UI tests; the worker itself is
+    # covered directly in tests/test_continuous_evaluation.py.
+    monkeypatch.setenv("BLUEEYE_SCHEDULER", "off")
     reset_settings_cache()
     st.cache_resource.clear()
     st.cache_data.clear()
@@ -349,8 +352,10 @@ def _settings_for(app_env) -> Settings:
 def test_account_page_renders_for_a_signed_in_user(app_env) -> None:
     at = _goto_account(_register(_app("dashboard"), "Ada", "ada@example.org", "secreT123"))
     assert not at.exception, at.exception
-    _by_key(at.button, "acct_pw_change")
+    _by_key(at.button, "acct_save_name")
+    _by_key(at.button, "acct_save_settings")
     _by_key(at.text_input, "acct_name")
+    _by_key(at.text_input, "acct_profession")
 
 
 def test_account_page_hides_internal_implementation_details(app_env) -> None:
@@ -382,25 +387,43 @@ def test_account_page_profile_update_persists(app_env) -> None:
     assert stored.full_name == "Ada Byron"
 
 
-def test_account_page_password_change_persists(app_env) -> None:
+def test_account_page_profile_details_persist(app_env) -> None:
     at = _goto_account(_register(_app("dashboard"), "Ada", "ada@example.org", "secreT123"))
-    _by_key(at.text_input, "acct_pw_current").set_value("secreT123")
-    _by_key(at.text_input, "acct_pw_new").set_value("newPass456")
-    _by_key(at.text_input, "acct_pw_confirm").set_value("newPass456")
-    _by_key(at.button, "acct_pw_change").click()
+    _by_key(at.text_input, "acct_profession").set_value("Marine biologist")
+    _by_key(at.text_input, "acct_organization").set_value("Reef Research Institute")
+    _by_key(at.text_input, "acct_country").set_value("India")
+    _by_key(at.text_input, "acct_interests").set_value("coral reef fish surveys")
+    _by_key(at.text_area, "acct_bio").set_value("I survey reef fish along the coast.")
+    _by_key(at.button, "acct_save_name").click()
     at.run()
 
     assert not at.exception, at.exception
-    # This device stays signed in after changing the password.
-    assert at.session_state["be_auth_token"]
-    # The new password really works; the old one no longer does.
-    service = AuthService(settings=_settings_for(app_env))
-    user, _token = service.login("ada@example.org", "newPass456")
-    assert user.email == "ada@example.org"
-    from app.auth import InvalidCredentialsError
+    stored = AuthService(settings=_settings_for(app_env)).store.get_user_by_email(
+        "ada@example.org"
+    )
+    assert stored.profession == "Marine biologist"
+    assert stored.organization == "Reef Research Institute"
+    assert stored.country == "India"
+    assert stored.research_interests == "coral reef fish surveys"
+    assert stored.bio == "I survey reef fish along the coast."
 
-    with pytest.raises(InvalidCredentialsError):
-        service.login("ada@example.org", "secreT123")
+
+def test_account_page_continuous_settings_persist(app_env) -> None:
+    from app.config import get_settings
+    from app.evaluation.schedules import ScheduleStore
+
+    at = _goto_account(_register(_app("dashboard"), "Ada", "ada@example.org", "secreT123"))
+    user_id = at.session_state["be_auth_user_id"]
+
+    _by_key(at.toggle, "acct_continuous_enabled").set_value(False)
+    _by_key(at.slider, "acct_continuous_poll").set_value(120)
+    _by_key(at.button, "acct_save_settings").click()
+    at.run()
+
+    assert not at.exception, at.exception
+    prefs = ScheduleStore(get_settings().evaluation_db_path).get_preferences(user_id)
+    assert prefs.enabled is False
+    assert prefs.poll_seconds == 120
 
 
 def test_sign_out_everywhere_else_keeps_this_device(app_env) -> None:
