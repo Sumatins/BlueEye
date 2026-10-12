@@ -664,8 +664,9 @@ pytest --cov=app       # with coverage
   routes, two-account isolation) and the per-account data scoping / ownership
   guard (`tests/test_user_scoping.py`).
 - **Integration tests** — real weights on a real image and a real generated
-  video; automatically **skipped** when weights are not downloaded and never
-  require a GPU.
+  video, plus the evaluation pipeline driven by the real detector
+  (`tests/test_evaluation_integration.py`); automatically **skipped** when
+  weights are not downloaded and never require a GPU.
 
 Run the model self-check (loads each model and runs a real inference test):
 

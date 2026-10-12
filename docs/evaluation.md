@@ -188,4 +188,8 @@ traced back to the exact conditions that produced it.
 
 The metric code, the dataset reader, the compatibility check and the report
 writers are covered by `tests/test_evaluation.py` (synthetic data, no weights,
-no network).
+no network). `tests/test_evaluation_integration.py` drives the same pipeline
+with the **real** detector and the upstream sample image (run with
+`pytest -m integration`); because no annotations are invented for that image
+the metric is honestly `0`, and the test asserts the *plumbing* — every real
+detection is mapped and the report files are written.
