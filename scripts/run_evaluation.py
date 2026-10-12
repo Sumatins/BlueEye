@@ -24,6 +24,13 @@ Examples::
     python scripts/run_evaluation.py --data data/raw/my_dataset/data.yaml \
         --model fish_inv --limit 25 --plots
 
+    # Also persist the run so it appears in the Research Evaluation Center
+    python scripts/run_evaluation.py --data data/raw/my_dataset/data.yaml \
+        --model all --record --owner <account-id>
+
+Exit codes: 0 success, 1 some models failed (partial), 2 invalid input
+(missing/unreadable config), 3 pending (no dataset / no model evaluated).
+
 SPDX-License-Identifier: AGPL-3.0-only
 """
 
@@ -40,16 +47,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.config import get_settings  # noqa: E402
 from app.evaluation import (  # noqa: E402
     DatasetError,
+    EvaluationStore,
     InferenceError,
     collect_environment,
     detector_predictor,
+    file_fingerprint,
     limit_split,
     load_split,
     model_class_names,
     run_evaluation,
     summarise,
+    validate_dataset,
     write_report,
 )
+from app.evaluation.environment import evaluator_version, git_commit  # noqa: E402
 
 SETUP_GUIDE = """\
 No labelled dataset was provided, so no metrics can be computed.
@@ -107,7 +118,28 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Override the per-model confidence threshold.",
     )
+    parser.add_argument(
+        "--iou",
+        type=float,
+        default=0.5,
+        help=(
+            "IoU threshold for the PR / F1 / confusion figures. The reported "
+            "mAP@0.5 and mAP@0.5:0.95 always use the standard COCO thresholds."
+        ),
+    )
     parser.add_argument("--plots", action="store_true", help="Write matplotlib charts.")
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="Persist the run in the evaluation database (Research Evaluation Center).",
+    )
+    parser.add_argument(
+        "--owner",
+        default="cli",
+        help="Owner id recorded for --record (default is the CLI sentinel).",
+    )
+    parser.add_argument("--name", default=None, help="Experiment name (default: timestamp).")
+    parser.add_argument("--notes", default="", help="Optional experiment notes.")
     parser.add_argument(
         "--list-models", action="store_true", help="List models and their classes, then exit."
     )
@@ -165,6 +197,27 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: dataset config not found: {data_yaml}", file=sys.stderr)
         return 2
 
+    # Validate the dataset *before* running: the CLI refuses to score a dataset
+    # it cannot honestly read, and prints the errors that block readiness.
+    try:
+        validation = validate_dataset(data_yaml, split=args.split)
+    except Exception as exc:  # noqa: BLE001 - unreadable config is reported
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    for issue in validation.errors:
+        location = f" ({issue.path})" if issue.path else ""
+        print(f"  error: [{issue.code}] {issue.message}{location}", file=sys.stderr)
+    for issue in validation.warnings:
+        location = f" ({issue.path})" if issue.path else ""
+        print(f"  warning: [{issue.code}] {issue.message}{location}", file=sys.stderr)
+    if not validation.ready:
+        print(
+            f"Error: dataset '{validation.name}' is not ready for the "
+            f"'{args.split}' split. Resolve the errors above.",
+            file=sys.stderr,
+        )
+        return 2
+
     try:
         dataset = load_split(data_yaml, split=args.split)
     except DatasetError as exc:
@@ -183,31 +236,40 @@ def main(argv: list[str] | None = None) -> int:
 
     selections = args.model or ["all"]
     evaluations = []
+    resolved_keys: list[str] = []
+    failures = 0
     for selection in selections:
         try:
             keys = detector.resolve_keys(selection)
         except Exception as exc:  # noqa: BLE001 - report and continue
             print(f"- model '{selection}': skipped ({exc})")
+            failures += 1
             continue
-        name = " + ".join(keys)
-        print(f"\nRunning {name} on {dataset.num_images} image(s) ...")
-        try:
-            classes = model_class_names(detector, selection)
-            predictor = detector_predictor(detector, selection, confidence=args.confidence)
-            evaluation = run_evaluation(name, predictor, dataset, classes)
-        except (InferenceError, Exception) as exc:  # noqa: BLE001 - report and continue
-            print(f"  skipped '{selection}': {exc}", file=sys.stderr)
-            continue
-        headline = summarise(evaluation)
-        print(
-            f"  mAP@0.5={headline['mAP50']:.4f}  "
-            f"mAP@0.5:0.95={headline['mAP50_95']:.4f}  "
-            f"P={headline['precision']:.4f} R={headline['recall']:.4f} "
-            f"({headline['seconds_per_image']:.3f}s/image)"
-        )
-        for note in evaluation.notes:
-            print(f"  note: {note}")
-        evaluations.append(evaluation)
+        # Each model is evaluated *independently* on the same split; scores are
+        # never merged across models.
+        for key in keys:
+            print(f"\nRunning {key} on {dataset.num_images} image(s) ...")
+            try:
+                classes = model_class_names(detector, key)
+                predictor = detector_predictor(
+                    detector, key, confidence=args.confidence
+                )
+                evaluation = run_evaluation(key, predictor, dataset, classes)
+            except (InferenceError, Exception) as exc:  # noqa: BLE001 - continue
+                print(f"  skipped '{key}': {exc}", file=sys.stderr)
+                failures += 1
+                continue
+            headline = summarise(evaluation)
+            print(
+                f"  mAP@0.5={headline['mAP50']:.4f}  "
+                f"mAP@0.5:0.95={headline['mAP50_95']:.4f}  "
+                f"P={headline['precision']:.4f} R={headline['recall']:.4f} "
+                f"({headline['seconds_per_image']:.3f}s/image)"
+            )
+            for note in evaluation.notes:
+                print(f"  note: {note}")
+            evaluations.append(evaluation)
+            resolved_keys.append(key)
 
     if not evaluations:
         print("No model could be evaluated. Nothing was written.", file=sys.stderr)
@@ -224,39 +286,126 @@ def main(argv: list[str] | None = None) -> int:
         "split": dataset.split,
         "limit": args.limit,
         "selections": selections,
+        "models": resolved_keys,
         "confidence_override": args.confidence,
+        "iou_threshold_for_figures": args.iou,
         "device": detector.device,
         "note": (
             "Input resolution and preprocessing are Ultralytics' defaults used "
             "by the application itself; the detector pipeline is unchanged."
         ),
     }
-    written = write_report(output_dir, evaluations, environment=environment, config=config)
 
-    figures: list = []
+    # Charts first so the HTML report can embed them.
+    figure_pairs: list[tuple[str, Path]] = []
     if args.plots:
-        try:
-            from app.evaluation.plots import plot_all, plot_examples
+        from app.evaluation import plots as plots_module
 
-            figures = plot_all(evaluations, output_dir)
-            for evaluation in evaluations:
-                figures.extend(
-                    plot_examples(evaluation, dataset, output_dir / "examples")
+        for evaluation in evaluations:
+            for path in plots_module.plot_evaluation_figures(
+                evaluation, output_dir, iou_threshold=args.iou
+            ):
+                figure_pairs.append((path.stem.replace("_", " "), path))
+            for path in plots_module.plot_examples(
+                evaluation, dataset, output_dir / "examples", limit=4
+            ):
+                figure_pairs.append((f"examples/{path.stem}", path))
+        if len(evaluations) > 1:
+            chart = plots_module.plot_metric_comparison(
+                evaluations, output_dir / "metric_comparison.png"
+            )
+            if chart is not None:
+                figure_pairs.append(("model comparison", chart))
+
+    experiment_payload = None
+    store = None
+    experiment_id = None
+    owner = args.owner
+    dataset_fingerprint = validation.fingerprint
+    if args.record:
+        store = EvaluationStore(settings.evaluation_db_path)
+        dataset_record = store.register_dataset(
+            owner,
+            dataset.name,
+            data_yaml,
+            class_names=validation.class_names,
+            splits=validation.splits_with_images,
+            fingerprint=dataset_fingerprint,
+            validation=validation.as_dict(),
+        )
+        fingerprints: dict = {}
+        for key in resolved_keys:
+            try:
+                fingerprints[key] = file_fingerprint(
+                    detector.model_manager.resolve_path(key)
                 )
-        except Exception as exc:  # noqa: BLE001 - plotting is optional
-            print(f"  (plots skipped: {exc})")
+            except Exception:  # noqa: BLE001 - provenance is best-effort
+                continue
+        exp_name = args.name or f"CLI evaluation {dataset.name} {dataset.split}"
+        record = store.create_experiment(
+            owner,
+            exp_name,
+            notes=args.notes,
+            purpose="Command-line evaluation (scripts/run_evaluation.py).",
+            dataset_id=dataset_record.id,
+            dataset_name=dataset.name,
+            data_yaml=str(data_yaml),
+            split=dataset.split,
+            class_names=dataset.class_names,
+            dataset_fingerprint=dataset_fingerprint,
+            model_keys=tuple(resolved_keys),
+            model_fingerprints=fingerprints,
+            evaluator_version=evaluator_version(),
+            parameters=config,
+            environment=environment,
+            git_commit=git_commit(),
+            status="running",
+        )
+        experiment_id = record.id
+        experiment_payload = record.as_dict()
 
-    print("\nWrote:")
-    for key, path in written.items():
-        print(f"  {key:14s} {path}")
-    for figure in figures:
-        print(f"  figure         {figure}")
-    print(
-        "\nReminder: these metrics were measured locally on the dataset/split "
-        "above. They are not comparable across different datasets."
+    written = write_report(
+        output_dir,
+        evaluations,
+        environment=environment,
+        config=config,
+        plots=figure_pairs,
+        experiment=experiment_payload,
     )
+
+    if store is not None and experiment_id is not None:
+        for evaluation in evaluations:
+            store.add_model_result(experiment_id, owner, evaluation)
+        final = "partially_completed" if failures else "completed"
+        store.set_status(experiment_id, owner, final)
+        for path in [*written.values(), *(item for _, item in figure_pairs)]:
+            try:
+                store.add_artifact(
+                    experiment_id,
+                    owner,
+                    path,
+                    name=path.name,
+                    role="plot" if path.suffix.lower() == ".png" else "report",
+                )
+            except OSError:
+                continue
+        print(f"\nRecorded experiment {experiment_id} (owner: {owner}).")
+
+    print(f"\nWrote report to: {output_dir}")
+    for key, path in written.items():
+        print(f"  {key}: {path}")
+    for caption, path in figure_pairs:
+        print(f"  figure ({caption}): {path}")
+
+    if failures:
+        print(
+            f"\nWarning: {failures} selection(s) could not be evaluated; the "
+            "results above are a partial success.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

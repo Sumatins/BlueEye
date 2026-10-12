@@ -93,7 +93,7 @@ def test_evaluation_center_is_pending_without_a_dataset(app_env) -> None:
     assert "pending" in blob.lower()
     # The page explains how to configure a dataset instead of inventing a score.
     assert "no labelled dataset" in blob.lower()
-    assert "Prepare a licensed dataset" in blob
+    assert "convert / register an existing yolo export" in blob.lower()
     assert "never reports a metric it did not measure" in blob
 
 
@@ -108,89 +108,94 @@ def test_comparison_page_is_honest_when_no_weights_are_installed(app_env) -> Non
     assert "How to read this" in blob
 
 
-# --------------------------------------------------------------------------- #
-# Stored evaluation runs (per-account, read back from disk)
-# --------------------------------------------------------------------------- #
-def _stored_payload(model: str) -> dict:
-    return {
-        "created": "2026-10-12T10:00:00",
-        "config": {"split": "test", "device": "cpu"},
-        "environment": {
-            "platform": "test",
-            "hardware": {"gpu": None, "cuda_available": False},
-            "packages": {},
-        },
-        "evaluations": [
-            {
-                "model": model,
-                "dataset": "tiny",
-                "split": "test",
-                "status": "complete",
-                "model_classes": ["scaridae"],
-                "comparison": {
-                    "supported": ["scaridae"],
-                    "unsupported_dataset_classes": ["shark"],
-                    "extra_model_classes": ["fish"],
-                },
-                "metrics": {
-                    "mAP50": 0.0,
-                    "mAP50_95": 0.0,
-                    "classes": [
-                        {
-                            "class_id": 0,
-                            "name": "scaridae",
-                            "gt": 0,
-                            "predictions": 2,
-                            "precision": 0.0,
-                            "recall": 0.0,
-                            "AP50": 0.0,
-                            "AP50_95": 0.0,
-                        }
-                    ],
-                    "notes": [],
-                },
-                "timing": {
-                    "images": 1,
-                    "predictions": 2,
-                    "inference_seconds": 0.8,
-                    "seconds_per_image": 0.8,
-                },
-                "notes": ["Ground truth is empty; metrics are honestly zero."],
-            }
-        ],
-        "summary": [
-            {
-                "model": model,
-                "dataset": "tiny",
-                "split": "test",
-                "status": "complete",
-                "images": 1,
-                "objects": 0,
-                "mAP50": 0.0,
-                "mAP50_95": 0.0,
-                "precision": 0.0,
-                "recall": 0.0,
-                "seconds_per_image": 0.8,
-            }
-        ],
-    }
+def test_all_evaluation_sections_render(app_env) -> None:
+    at = _register(_app("evaluation"))
+    user_id = at.session_state["be_auth_user_id"]
+    _seed_stored_run(user_id, "Owned Model", "Owned Model")
+    at = _goto(at, "evaluation")
+
+    for section in ("Run", "Experiments", "Datasets", "Compare"):
+        _by_key(at.radio, "eval_section").set_value(section)
+        at = at.run()
+        assert not at.exception, (section, at.exception)
+        if section == "Experiments":
+            assert "Owned Model" in _rendered_text(at)
 
 
-def _seed_stored_run(user_id: str, name: str, model: str) -> None:
-    run_dir = get_settings().outputs_dir / "evaluation" / user_id / name
-    run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "results.json").write_text(
-        json.dumps(_stored_payload(model)), encoding="utf-8"
+def test_compare_section_offers_a_comparison_export(app_env) -> None:
+    at = _register(_app("evaluation"))
+    user_id = at.session_state["be_auth_user_id"]
+    _seed_stored_run(user_id, "Run A", "Run A")
+    _seed_stored_run(user_id, "Run B", "Run B")
+    at = _goto(at, "evaluation")
+    _by_key(at.radio, "eval_section").set_value("Compare")
+    at = at.run()
+
+    assert not at.exception, at.exception
+    download_labels = [
+        getattr(element, "label", "") for element in at.get("download_button")
+    ]
+    assert any("comparison" in label.lower() for label in download_labels)
+
+
+# --------------------------------------------------------------------------- #
+# Stored evaluation runs (per-account, read back from the persistent store)
+# --------------------------------------------------------------------------- #
+def _seed_stored_run(user_id: str, name: str, model: str) -> str:
+    """Create a completed experiment with one result and one artifact."""
+    from app.evaluation.compat import compare_classes
+    from app.evaluation.experiments import EvaluationStore
+    from app.evaluation.metrics import DetectionBox, evaluate
+    from app.evaluation.runner import ModelEvaluation
+
+    settings = get_settings()
+    store = EvaluationStore(settings.evaluation_db_path)
+    experiment = store.create_experiment(
+        user_id,
+        name,
+        dataset_name="tiny",
+        data_yaml="tiny/data.yaml",
+        split="test",
+        class_names=("scaridae",),
+        status="completed",
     )
-    (run_dir / "metrics.csv").write_text("model,mAP50\n%s,0.0\n" % model, encoding="utf-8")
+    metrics = evaluate(
+        {"a.jpg": [DetectionBox(0, 0, 0, 10, 10, 1.0)]},
+        {"a.jpg": []},
+        class_names={0: "scaridae"},
+    )
+    evaluation = ModelEvaluation(
+        model=model,
+        dataset="tiny",
+        split="test",
+        model_classes=("scaridae",),
+        compat=compare_classes(("scaridae",), ("scaridae",)),
+        metrics=metrics,
+        num_images=1,
+        images_evaluated=1,
+        num_predictions=0,
+        inference_seconds=0.8,
+        status="complete",
+        notes=("Ground truth is empty; metrics are honestly zero.",),
+    )
+    store.add_model_result(experiment.id, user_id, evaluation)
+
+    run_dir = get_settings().outputs_dir / "evaluation" / user_id / experiment.id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    results = run_dir / "results.json"
+    results.write_text(
+        json.dumps({"config": {"split": "test"}, "summary": []}), encoding="utf-8"
+    )
+    store.add_artifact(experiment.id, user_id, results, name="results.json", role="report")
+    return experiment.id
 
 
 def test_stored_evaluation_run_is_rendered_for_its_owner(app_env) -> None:
     at = _register(_app("evaluation"))
     user_id = at.session_state["be_auth_user_id"]
-    _seed_stored_run(user_id, "20261012-100000", "Owned Model")
+    _seed_stored_run(user_id, "Owned Model", "Owned Model")
     # Another account's run must never surface in this account's console.
-    _seed_stored_run("b" * 32, "20261012-090000", "Someone Elses Model")
+    _seed_stored_run("b" * 32, "Someone Elses Model", "Someone Elses Model")
 
     at = _goto(at, "evaluation")
 

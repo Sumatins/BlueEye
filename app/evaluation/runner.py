@@ -55,6 +55,10 @@ class ModelEvaluation:
     predictions: dict[str, list[DetectionBox]] = field(
         default_factory=dict, repr=False, compare=False
     )
+    #: Ground truth in the same space, kept for curve/confusion figures only.
+    ground_truth: dict[str, list[DetectionBox]] = field(
+        default_factory=dict, repr=False, compare=False
+    )
 
     @property
     def seconds_per_image(self) -> float:
@@ -177,6 +181,7 @@ def run_evaluation(
         status=status,
         notes=tuple(notes),
         predictions=predictions,
+        ground_truth=dict(dataset.ground_truth),
     )
 
 

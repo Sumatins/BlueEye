@@ -13,8 +13,16 @@ from __future__ import annotations
 import importlib
 import os
 import platform
+import subprocess
 import sys
 from datetime import datetime
+
+from app.config import PROJECT_ROOT
+
+#: Marker for BlueEye's own evaluator (matching recipe + metric set). Bump this
+#: when the evaluator's conventions change so old experiments are not compared
+#: against new ones as if they used the same recipe.
+EVALUATOR_VERSION = "blueeye-eval/1 (COCO greedy match, IoU 0.50-0.95)"
 
 
 def _version(module_name: str) -> str:
@@ -62,3 +70,25 @@ def collect_environment() -> dict:
             "Pillow": _version("PIL"),
         },
     }
+
+
+def evaluator_version() -> str:
+    """Version marker for BlueEye's evaluator conventions."""
+    return EVALUATOR_VERSION
+
+
+def git_commit() -> str:
+    """Short HEAD commit, or an empty string when git is unavailable."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:  # noqa: BLE001 - provenance is best-effort
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()

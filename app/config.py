@@ -140,6 +140,10 @@ class Settings:
     #: a *separate* SQLite file from authentication so observation migrations
     #: can never touch accounts or sessions.
     observations_db: Path | None = None
+    #: Persistent research-evaluation experiments database (see app.evaluation).
+    #: Another *separate* SQLite file so evaluation migrations can never touch
+    #: accounts, sessions or saved observations.
+    evaluation_db: Path | None = None
     #: How long a session token stays valid (days, server-side expiry).
     session_ttl_days: int = 7
     #: Minimum password length enforced at registration / password change.
@@ -180,6 +184,19 @@ class Settings:
         if self.observations_db is None:
             return self.outputs_dir / "observations" / "blueeye_observations.db"
         path = self.observations_db
+        return path if path.is_absolute() else PROJECT_ROOT / path
+
+    @property
+    def evaluation_db_path(self) -> Path:
+        """Path of the persistent evaluation-experiments database.
+
+        Defaults to ``outputs/evaluation/`` and is overridable with
+        ``BLUEEYE_EVALUATION_DB``. It is deliberately separate from both the
+        authentication database and the observations database.
+        """
+        if self.evaluation_db is None:
+            return self.outputs_dir / "evaluation" / "blueeye_evaluation.db"
+        path = self.evaluation_db
         return path if path.is_absolute() else PROJECT_ROOT / path
 
     def is_reviewer(self, email: str | None) -> bool:
@@ -229,6 +246,7 @@ class Settings:
             self.videos_output_dir,
             self.reports_output_dir,
             self.observations_db_path.parent,
+            self.evaluation_db_path.parent,
         ):
             directory.mkdir(parents=True, exist_ok=True)
 
@@ -304,6 +322,12 @@ def get_settings() -> Settings:
             PROJECT_ROOT / "outputs" / "observations" / "blueeye_observations.db",
         )
         if _env_str("OBSERVATIONS_DB", "")
+        else None,
+        evaluation_db=_resolve_path(
+            _env_str("EVALUATION_DB", ""),
+            PROJECT_ROOT / "outputs" / "evaluation" / "blueeye_evaluation.db",
+        )
+        if _env_str("EVALUATION_DB", "")
         else None,
         session_ttl_days=_env_int("SESSION_TTL_DAYS", 7),
         password_min_length=_env_int("PASSWORD_MIN_LENGTH", 8),

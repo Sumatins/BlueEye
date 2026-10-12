@@ -13,7 +13,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Sequence
 
-from app.evaluation.metrics import box_iou
+from app.evaluation.metrics import (
+    ClassCurve,
+    box_iou,
+    class_curves,
+    detection_confusion,
+)
 from app.evaluation.runner import ModelEvaluation, summarise
 
 
@@ -109,6 +114,184 @@ def plot_all(
         if figure is not None:
             created.append(figure)
     return created
+
+
+def _class_names_for(evaluation: ModelEvaluation) -> dict[int, str]:
+    """``{class_id: name}`` from whatever classes the evaluation touched."""
+    names: dict[int, str] = {
+        metric.class_id: metric.name for metric in evaluation.metrics.classes
+    }
+    for boxes in (*evaluation.ground_truth.values(), *evaluation.predictions.values()):
+        for box in boxes:
+            names.setdefault(box.class_id, str(box.class_id))
+    return names
+
+
+def plot_precision_recall(
+    evaluation: ModelEvaluation,
+    output_path: str | Path,
+    *,
+    iou_threshold: float = 0.5,
+) -> Path | None:
+    """Per-class precision-recall curves at one IoU threshold."""
+    plt = _pyplot()
+    names = _class_names_for(evaluation)
+    curves: tuple[ClassCurve, ...] = class_curves(
+        evaluation.ground_truth,
+        evaluation.predictions,
+        class_names=names,
+        iou_threshold=iou_threshold,
+    )
+    if plt is None or not curves:
+        return None
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    figure, axis = plt.subplots(figsize=(6.5, 5))
+    for curve in curves:
+        axis.plot(
+            list(curve.recall),
+            list(curve.precision),
+            linewidth=1.8,
+            label=f"{curve.name} (AP@0.5={curve.ap:.3f}, n={curve.num_gt})",
+        )
+    axis.set_xlabel("Recall")
+    axis.set_ylabel("Precision")
+    axis.set_xlim(0.0, 1.0)
+    axis.set_ylim(0.0, 1.05)
+    axis.set_title(
+        f"Precision-recall @ IoU {iou_threshold:g} - {evaluation.model}"
+    )
+    axis.grid(alpha=0.3)
+    axis.legend(fontsize=8, loc="lower left")
+    figure.tight_layout()
+    figure.savefig(path, dpi=150)
+    plt.close(figure)
+    return path
+
+
+def plot_f1_confidence(
+    evaluation: ModelEvaluation,
+    output_path: str | Path,
+    *,
+    iou_threshold: float = 0.5,
+) -> Path | None:
+    """Per-class F1 as a function of the confidence threshold."""
+    plt = _pyplot()
+    names = _class_names_for(evaluation)
+    curves: tuple[ClassCurve, ...] = class_curves(
+        evaluation.ground_truth,
+        evaluation.predictions,
+        class_names=names,
+        iou_threshold=iou_threshold,
+    )
+    if plt is None or not curves:
+        return None
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    figure, axis = plt.subplots(figsize=(6.5, 5))
+    for curve in curves:
+        axis.plot(
+            list(curve.confidence),
+            list(curve.f1),
+            linewidth=1.8,
+            label=curve.name,
+        )
+    axis.set_xlabel("Confidence")
+    axis.set_ylabel("F1")
+    axis.set_xlim(0.0, 1.0)
+    axis.set_ylim(0.0, 1.05)
+    axis.set_title(f"F1 vs confidence @ IoU {iou_threshold:g} - {evaluation.model}")
+    axis.grid(alpha=0.3)
+    axis.legend(fontsize=8, loc="upper right")
+    figure.tight_layout()
+    figure.savefig(path, dpi=150)
+    plt.close(figure)
+    return path
+
+
+def plot_confusion_matrix(
+    evaluation: ModelEvaluation,
+    output_path: str | Path,
+    *,
+    iou_threshold: float = 0.5,
+) -> Path | None:
+    """Detections confusion matrix (last row/column = background)."""
+    plt = _pyplot()
+    names = _class_names_for(evaluation)
+    if plt is None or not names:
+        return None
+    num_classes = max(names) + 1
+    matrix = detection_confusion(
+        evaluation.ground_truth,
+        evaluation.predictions,
+        num_classes,
+        iou_threshold=iou_threshold,
+    )
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    labels = [names.get(index, str(index)) for index in range(num_classes)] + [
+        "background"
+    ]
+    figure, axis = plt.subplots(figsize=(max(6, num_classes * 0.9), max(5, num_classes * 0.8)))
+    image = axis.imshow(matrix, cmap="Blues")
+    axis.set_xticks(range(len(labels)))
+    axis.set_yticks(range(len(labels)))
+    axis.set_xticklabels(labels, rotation=40, ha="right", fontsize=8)
+    axis.set_yticklabels(labels, fontsize=8)
+    axis.set_xlabel("Ground truth")
+    axis.set_ylabel("Predicted")
+    axis.set_title(f"Detections confusion @ IoU {iou_threshold:g} - {evaluation.model}")
+    normaliser = matrix.max() or 1.0
+    for row in range(matrix.shape[0]):
+        for column in range(matrix.shape[1]):
+            value = int(matrix[row, column])
+            if value:
+                axis.text(
+                    column,
+                    row,
+                    str(value),
+                    ha="center",
+                    va="center",
+                    color="white" if matrix[row, column] > normaliser * 0.6 else "black",
+                    fontsize=8,
+                )
+    figure.colorbar(image, ax=axis, fraction=0.046, pad=0.04)
+    figure.tight_layout()
+    figure.savefig(path, dpi=150)
+    plt.close(figure)
+    return path
+
+
+def plot_evaluation_figures(
+    evaluation: ModelEvaluation,
+    output_dir: str | Path,
+    *,
+    iou_threshold: float = 0.5,
+) -> list[Path]:
+    """All supported per-model figures: per-class AP, PR, F1 and confusion."""
+    out_dir = Path(output_dir)
+    safe = "".join(
+        character if character.isalnum() else "_" for character in evaluation.model
+    )
+    written: list[Path] = []
+    for path in (
+        plot_per_class(evaluation, out_dir / f"per_class_{safe}.png"),
+        plot_precision_recall(
+            evaluation, out_dir / f"pr_curve_{safe}.png", iou_threshold=iou_threshold
+        ),
+        plot_f1_confidence(
+            evaluation, out_dir / f"f1_curve_{safe}.png", iou_threshold=iou_threshold
+        ),
+        plot_confusion_matrix(
+            evaluation, out_dir / f"confusion_{safe}.png", iou_threshold=iou_threshold
+        ),
+    ):
+        if path is not None:
+            written.append(path)
+    return written
 
 
 def _match_stats(ground_truth, predictions):

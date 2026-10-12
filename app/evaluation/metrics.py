@@ -265,3 +265,137 @@ def evaluate(
         notes=tuple(notes),
     )
 
+
+# --------------------------------------------------------------------------- #
+# Curves and confusion (for the results workspace)
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class ClassCurve:
+    """Precision / recall / F1 across the confidence ranking of one class."""
+
+    class_id: int
+    name: str
+    num_gt: int
+    num_pred: int
+    confidence: tuple[float, ...]
+    recall: tuple[float, ...]
+    precision: tuple[float, ...]
+    f1: tuple[float, ...]
+    ap: float
+
+    @property
+    def best_f1(self) -> tuple[float, float, float]:
+        """(confidence, precision, recall) at the maximum-F1 operating point."""
+        if not self.confidence:
+            return 0.0, 0.0, 0.0
+        index = int(np.argmax(np.asarray(self.f1)))
+        return (
+            float(self.confidence[index]),
+            float(self.precision[index]),
+            float(self.recall[index]),
+        )
+
+
+def class_curves(
+    ground_truth: Mapping[str, list[DetectionBox]],
+    predictions: Mapping[str, list[DetectionBox]],
+    *,
+    class_names: Mapping[int, str] | None = None,
+    iou_threshold: float = 0.5,
+    min_gt: int = 1,
+) -> tuple[ClassCurve, ...]:
+    """Real per-class PR/F1 curves at one IoU threshold.
+
+    Only classes with at least ``min_gt`` ground-truth boxes are returned: a
+    precision-recall curve for a class the annotations never contain would be
+    meaningless.
+    """
+    names = dict(class_names or {})
+    class_ids = sorted(
+        {box.class_id for boxes in ground_truth.values() for box in boxes}
+    )
+    curves: list[ClassCurve] = []
+    for class_id in class_ids:
+        gt_by_image = {
+            image: [box for box in boxes if box.class_id == class_id]
+            for image, boxes in ground_truth.items()
+        }
+        num_gt = sum(len(boxes) for boxes in gt_by_image.values())
+        if num_gt < 1:
+            continue
+        preds: list[tuple[str, DetectionBox]] = [
+            (image, box)
+            for image, boxes in predictions.items()
+            for box in boxes
+            if box.class_id == class_id
+        ]
+        preds.sort(key=lambda item: item[1].score, reverse=True)
+        tp, fp = _match_threshold(preds, gt_by_image, iou_threshold)
+        cum_tp = np.cumsum(tp) if tp else np.array([])
+        cum_fp = np.cumsum(fp) if fp else np.array([])
+        recall = cum_tp / float(num_gt)
+        precision = cum_tp / np.maximum(cum_tp + cum_fp, 1e-9)
+        f1 = 2.0 * precision * recall / np.maximum(precision + recall, 1e-9)
+        curves.append(
+            ClassCurve(
+                class_id=class_id,
+                name=names.get(class_id, str(class_id)),
+                num_gt=num_gt,
+                num_pred=len(preds),
+                confidence=tuple(float(item[1].score) for item in preds),
+                recall=tuple(float(v) for v in recall),
+                precision=tuple(float(v) for v in precision),
+                f1=tuple(float(v) for v in f1),
+                ap=_average_precision(recall, precision),
+            )
+        )
+    return tuple(curves)
+
+
+def detection_confusion(
+    ground_truth: Mapping[str, list[DetectionBox]],
+    predictions: Mapping[str, list[DetectionBox]],
+    num_classes: int,
+    *,
+    iou_threshold: float = 0.5,
+) -> np.ndarray:
+    """Confusion matrix at one IoU threshold.
+
+    Returns a ``(num_classes + 1) x (num_classes + 1)`` matrix; the last row
+    and column are *background*. A prediction is matched to the
+    highest-IoU ground-truth box that is still unmatched **regardless of
+    class**, so a misclassified detection lands off the diagonal:
+
+    * ``matrix[predicted, true]`` - a real object predicted as another class;
+    * last column - a prediction with no matching ground truth (spurious);
+    * last row - a ground-truth object with no matching prediction (missed).
+    """
+    size = num_classes + 1
+    background = num_classes
+    matrix = np.zeros((num_classes + 1, num_classes + 1), dtype=float)
+    for image in set(ground_truth) | set(predictions):
+        gt_boxes = ground_truth.get(image, [])
+        pred_boxes = predictions.get(image, [])
+        matched = [False] * len(gt_boxes)
+        for prediction in sorted(pred_boxes, key=lambda box: box.score, reverse=True):
+            best_iou = 0.0
+            best_index = -1
+            for index, target in enumerate(gt_boxes):
+                if matched[index]:
+                    continue
+                value = box_iou(prediction, target)
+                if value > best_iou:
+                    best_iou = value
+                    best_index = index
+            if best_index >= 0 and best_iou >= iou_threshold:
+                matched[best_index] = True
+                row = min(prediction.class_id, num_classes)
+                column = min(gt_boxes[best_index].class_id, num_classes)
+                matrix[row, column] += 1
+            else:
+                matrix[min(prediction.class_id, num_classes), num_classes] += 1
+        for index, target in enumerate(gt_boxes):
+            if not matched[index]:
+                matrix[num_classes, min(target.class_id, num_classes)] += 1
+    return matrix
+

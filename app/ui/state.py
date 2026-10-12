@@ -28,6 +28,7 @@ from app.config import (
 )
 from app.detection.detector import MarineDetector
 from app.detection.model_manager import ModelSpec
+from app.evaluation.experiments import EvaluationStore
 from app.observations.builder import build_analysis
 from app.observations.models import Analysis, ObservationError
 from app.observations.store import ObservationStore
@@ -79,6 +80,28 @@ def get_settings_cached():
 def get_observation_store(db_path: str) -> ObservationStore:
     """One observation store per database path (survives reruns/restarts)."""
     return ObservationStore(db_path)
+
+
+@st.cache_resource(show_spinner=False)
+def get_evaluation_store(db_path: str) -> EvaluationStore:
+    """One evaluation store per database path (survives reruns/restarts)."""
+    return EvaluationStore(db_path)
+
+
+def evaluation_store(settings: Any) -> EvaluationStore:
+    """The cached evaluation store for the current configuration."""
+    return get_evaluation_store(str(settings.evaluation_db_path))
+
+
+def evaluation_run_dir(settings: Any, user_id: str, experiment_id: str) -> Path:
+    """Per-account artifact directory for one experiment.
+
+    Always built from the server-verified account id and the server-generated
+    experiment id, never from a browser-supplied path.
+    """
+    directory = settings.outputs_dir / "evaluation" / user_id / experiment_id
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
 
 
 # --------------------------------------------------------------------------- #
@@ -434,6 +457,10 @@ PRIVATE_SESSION_KEYS = (
     "observation_flash",
     "observations_offset",
     "observations_query",
+    "eval_goto",
+    "eval_last_run",
+    "eval_open_experiment",
+    "eval_compare_selection",
 )
 
 

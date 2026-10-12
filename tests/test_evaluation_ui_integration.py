@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import time
 from pathlib import Path
 
 import pytest
@@ -30,6 +31,7 @@ from app.config import PROJECT_ROOT, get_settings, reset_settings_cache
 from app.detection.detector import MarineDetector
 from app.detection.model_manager import ModelManager
 from app.evaluation import model_class_names
+from app.evaluation.experiments import TERMINAL_STATUSES, EvaluationStore
 
 APP = str(Path(__file__).resolve().parents[1] / "app" / "ui" / "streamlit_app.py")
 SAMPLE_IMAGE = PROJECT_ROOT / "assets" / "images" / "input_folder" / "regq.jpg"
@@ -123,13 +125,35 @@ def test_evaluation_page_runs_and_stores_a_real_report(app_env) -> None:
 
     _by_key(at.button, "eval_run").click()
     at = at.run()
-    # Let any trailing rerun settle.
-    at = at.run()
-
-    assert not at.exception, at.exception
 
     user_id = at.session_state["be_auth_user_id"]
-    reports = list((get_settings().outputs_dir / "evaluation" / user_id).glob("*/results.json"))
+    settings = get_settings()
+    store = EvaluationStore(settings.evaluation_db_path)
+
+    # The run happens on a background thread; poll the persistent store until it
+    # reaches a terminal status (or the deadline passes).
+    record = None
+    deadline = time.time() + 300
+    while time.time() < deadline:
+        finished = [
+            item
+            for item in store.list_experiments(user_id)
+            if item.status in TERMINAL_STATUSES
+        ]
+        if finished:
+            record = finished[0]
+            break
+        time.sleep(1)
+        at = at.run()
+
+    assert record is not None, "the evaluation never reached a terminal status"
+    assert record.status in {"completed", "partially_completed"}, record.status
+
+    # Re-render the page now the run is stored; the report download appears.
+    at = at.run()
+    assert not at.exception, at.exception
+
+    reports = list((settings.outputs_dir / "evaluation" / user_id).glob("*/results.json"))
     assert len(reports) == 1, reports
     payload = json.loads(reports[0].read_text(encoding="utf-8"))
     assert payload["config"]["split"] == "test"

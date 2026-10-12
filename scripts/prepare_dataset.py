@@ -28,14 +28,18 @@ Examples
 --------
 Audit a dataset without copying anything::
 
-    python scripts/prepare_dataset.py --source "D:/data/NR Underwater" --audit-only
+    python scripts/prepare_dataset.py "D:/data/NR Underwater" --audit-only
 
 Prepare it for training as ``indian_marine``::
 
-    python scripts/prepare_dataset.py \
-        --source "D:/data/NR Underwater" \
+    python scripts/prepare_dataset.py "D:/data/NR Underwater" \
         --name indian_marine \
         --classes whale_shark octopus ray olive_ridley_turtle
+
+The dataset directory may be given positionally (recommended) or with
+``--source``; the output is written to ``data/raw/<name>`` where the Research
+Evaluation Center discovers it automatically. Add ``--register`` to also save
+it in the evaluation database.
 
 SPDX-License-Identifier: AGPL-3.0-only
 """
@@ -322,7 +326,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Validate and lay out a downloaded dataset for YOLO training."
     )
-    parser.add_argument("--source", required=True, help="Dataset directory to prepare.")
+    parser.add_argument(
+        "path",
+        nargs="?",
+        default=None,
+        help=(
+            "Dataset directory to prepare (positional form: "
+            "'prepare_dataset.py <path> --name my_dataset')."
+        ),
+    )
+    parser.add_argument(
+        "--source",
+        default=None,
+        help="Dataset directory to prepare (alternative to the positional path).",
+    )
     parser.add_argument(
         "--out",
         default=None,
@@ -346,14 +363,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write data.yaml + audit but do not copy the image/label files.",
     )
     parser.add_argument("--overwrite", action="store_true", help="Replace a non-empty output dir.")
+    parser.add_argument(
+        "--register",
+        action="store_true",
+        help=(
+            "After a successful copy, validate and save the dataset in the "
+            "evaluation database (owner: --owner) so it appears in the "
+            "Research Evaluation Center."
+        ),
+    )
+    parser.add_argument(
+        "--owner",
+        default="cli",
+        help="Owner id used by --register (default is the CLI sentinel).",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
-    source = Path(args.source)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    source_arg = args.source or args.path
+    if not source_arg:
+        print(
+            "error: provide the dataset directory as a positional argument or "
+            "with --source.",
+            file=sys.stderr,
+        )
+        return 2
+    source = Path(source_arg)
     name = args.name or source.name
     out = Path(args.out) if args.out else Path("data") / "raw" / name
+
 
     try:
         info = prepare_dataset(
@@ -384,7 +425,62 @@ def main(argv: list[str] | None = None) -> int:
     if not args.audit_only:
         print(f"Prepared at: {out.resolve()}")
         print(f"Train with:  python scripts/train.py --data {out.as_posix()}/data.yaml")
+    if args.register and not args.audit_only:
+        _register(out / "data.yaml", info["name"], args.owner)
     return 0
+
+
+def _register(data_yaml: Path, name: str, owner: str) -> None:
+    """Validate the prepared layout and save it in the evaluation database.
+
+    Registration is best-effort and only runs after the files were actually
+    written, so a conversion is never claimed without having been performed.
+    A failure to record never turns a successful copy into an error.
+    """
+    if not data_yaml.is_file():
+        print(
+            f"warning: {data_yaml} was not written; dataset not registered.",
+            file=sys.stderr,
+        )
+        return
+    try:
+        from app.config import get_settings
+        from app.evaluation.experiments import EvaluationStore
+        from app.evaluation.validation import DatasetValidationError, validate_dataset
+
+        validation = validate_dataset(data_yaml)
+    except DatasetValidationError as exc:
+        print(f"warning: could not validate the prepared dataset: {exc}", file=sys.stderr)
+        return
+    except Exception as exc:  # noqa: BLE001 - registration is optional
+        print(f"warning: could not validate the prepared dataset: {exc}", file=sys.stderr)
+        return
+
+    for issue in validation.errors:
+        print(f"  error: [{issue.code}] {issue.message}", file=sys.stderr)
+    for issue in validation.warnings:
+        print(f"  warning: [{issue.code}] {issue.message}", file=sys.stderr)
+
+    try:
+        settings = get_settings()
+        store = EvaluationStore(settings.evaluation_db_path)
+        record = store.register_dataset(
+            owner,
+            name,
+            data_yaml,
+            class_names=validation.class_names,
+            splits=validation.splits_with_images,
+            fingerprint=validation.fingerprint,
+            validation=validation.as_dict(),
+        )
+    except Exception as exc:  # noqa: BLE001 - registration is optional
+        print(f"warning: could not register the dataset: {exc}", file=sys.stderr)
+        return
+    print(
+        f"Registered dataset '{record.name}' for owner '{owner}' "
+        f"({len(record.class_names)} classes, splits: "
+        f"{', '.join(record.splits) or 'none'})."
+    )
 
 
 if __name__ == "__main__":

@@ -24,9 +24,15 @@ Modules
 ``runner``
     Orchestration: run a model over a split with an injectable predictor.
 ``report``
-    JSON / CSV / Markdown writers.
+    JSON / CSV / Markdown / self-contained HTML writers.
 ``plots``
-    Optional matplotlib figures (metric comparison, per-class).
+    Optional matplotlib figures (comparison, per-class AP, PR, F1, confusion).
+``validation``
+    Read-only dataset validation (errors vs warnings) before a run.
+``discovery``
+    Finding locally prepared labelled datasets.
+``experiments``
+    Persistent, owner-scoped experiment and dataset storage.
 
 SPDX-License-Identifier: AGPL-3.0-only
 """
@@ -44,16 +50,38 @@ from app.evaluation.datasets import (
     parse_label_file,
     read_yaml,
 )
+from app.evaluation.discovery import (
+    DatasetInfo,
+    available_splits,
+    default_search_roots,
+    discover_datasets,
+    find_data_yaml,
+)
 from app.evaluation.environment import collect_environment
+from app.evaluation.experiments import (
+    ACTIVE_STATUSES,
+    EXPERIMENT_STATUSES,
+    TERMINAL_STATUSES,
+    ArtifactRecord,
+    DatasetRecord,
+    EvaluationStore,
+    ExperimentError,
+    ExperimentRecord,
+    ModelResultRecord,
+    file_fingerprint,
+)
 from app.evaluation.metrics import (
     IOU_THRESHOLDS,
+    ClassCurve,
     ClassMetrics,
     DetectionBox,
     EvaluationResult,
     box_iou,
+    class_curves,
+    detection_confusion,
     evaluate,
 )
-from app.evaluation.report import render_summary, write_report
+from app.evaluation.report import render_html_report, render_summary, write_report
 from app.evaluation.runner import (
     InferenceError,
     ModelEvaluation,
@@ -63,32 +91,63 @@ from app.evaluation.runner import (
     run_many,
     summarise,
 )
+from app.evaluation.validation import (
+    DatasetIssue,
+    DatasetValidation,
+    DatasetValidationError,
+    SplitReport,
+    validate_dataset,
+)
 
 __all__ = [
+    "ACTIVE_STATUSES",
+    "EXPERIMENT_STATUSES",
     "IOU_THRESHOLDS",
+    "TERMINAL_STATUSES",
+    "ArtifactRecord",
     "ClassCompat",
+    "ClassCurve",
     "ClassMetrics",
     "DatasetError",
+    "DatasetInfo",
+    "DatasetIssue",
+    "DatasetRecord",
     "DatasetSplit",
+    "DatasetValidation",
+    "DatasetValidationError",
     "DetectionBox",
     "EvaluationResult",
+    "EvaluationStore",
+    "ExperimentError",
+    "ExperimentRecord",
     "InferenceError",
     "ModelEvaluation",
+    "ModelResultRecord",
+    "SplitReport",
+    "available_splits",
     "box_iou",
+    "class_curves",
     "class_names_from_yaml",
     "collect_environment",
     "compare_classes",
+    "default_search_roots",
+    "detection_confusion",
     "detector_predictor",
+    "discover_datasets",
     "evaluate",
+    "file_fingerprint",
+    "find_data_yaml",
     "limit_split",
     "load_data_yaml",
     "load_split",
     "model_class_names",
     "parse_label_file",
     "read_yaml",
+    "render_html_report",
     "render_summary",
     "run_evaluation",
     "run_many",
     "summarise",
+    "validate_dataset",
     "write_report",
 ]
