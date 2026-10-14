@@ -50,6 +50,7 @@ from app.evaluation import (  # noqa: E402
     EvaluationStore,
     InferenceError,
     collect_environment,
+    compare_classes,
     detector_predictor,
     file_fingerprint,
     limit_split,
@@ -251,6 +252,20 @@ def main(argv: list[str] | None = None) -> int:
             print(f"\nRunning {key} on {dataset.num_images} image(s) ...")
             try:
                 classes = model_class_names(detector, key)
+                # Same rule as the UI: a model that shares no class name with
+                # the dataset is *not* scored. Reporting zeros here would look
+                # like a measured result, which it is not.
+                compatibility = compare_classes(dataset.class_names, classes)
+                if not compatibility.comparable:
+                    # Expected, handled condition (not an error): say why on
+                    # stdout so it does not look like a crash.
+                    print(
+                        f"  skipped '{key}': it shares no class names with the "
+                        f"dataset ({', '.join(dataset.class_names) or 'none'}); "
+                        "scoring it would not be a valid comparison."
+                    )
+                    failures += 1
+                    continue
                 predictor = detector_predictor(
                     detector, key, confidence=args.confidence
                 )

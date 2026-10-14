@@ -266,6 +266,60 @@ def test_stored_evaluation_run_is_rendered_for_its_owner(app_env) -> None:
     assert any(label.startswith("Results (JSON)") for label in download_labels)
 
 
+def _seed_incomparable_run(user_id: str, name: str, model: str) -> str:
+    """A stored run whose model shares no class names with the dataset.
+
+    Reproduces the historical record that was wrongly stamped ``completed``:
+    the console must flag it as not a valid comparison.
+    """
+    from app.evaluation.compat import compare_classes
+    from app.evaluation.experiments import EvaluationStore
+    from app.evaluation.metrics import evaluate
+    from app.evaluation.runner import ModelEvaluation
+
+    store = EvaluationStore(get_settings().evaluation_db_path)
+    experiment = store.create_experiment(
+        user_id,
+        name,
+        dataset_name="tiny",
+        data_yaml="tiny/data.yaml",
+        split="test",
+        class_names=("fish",),
+        status="completed",
+    )
+    metrics = evaluate({"a.jpg": []}, {"a.jpg": []}, class_names={0: "dolphin"})
+    evaluation = ModelEvaluation(
+        model=model,
+        dataset="tiny",
+        split="test",
+        model_classes=("dolphin",),
+        compat=compare_classes(("fish",), ("dolphin",)),
+        metrics=metrics,
+        num_images=1,
+        images_evaluated=1,
+        num_predictions=0,
+        inference_seconds=0.8,
+        status="not_comparable",
+    )
+    store.add_model_result(experiment.id, user_id, evaluation)
+    return experiment.id
+
+
+def test_incomparable_run_is_flagged_not_a_valid_comparison(app_env) -> None:
+    at = _register(_app("evaluation"))
+    user_id = at.session_state["be_auth_user_id"]
+    _seed_incomparable_run(user_id, "Mismatched Model", "Mismatched Model")
+
+    at = _goto(at, "evaluation")
+
+    assert not at.exception, at.exception
+    blob = _rendered_text(at)
+    assert "Mismatched Model" in blob
+    assert "Not a valid comparison" in blob
+    # A run with no comparable result must not read as a green "completed".
+    assert "not comparable" in blob
+
+
 def _seed_running_run(user_id: str, name: str) -> str:
     """Create a *running* experiment carrying real progress counters."""
     from app.evaluation.experiments import EvaluationStore

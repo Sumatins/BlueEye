@@ -330,3 +330,33 @@ def test_resolve_data_yaml_dir_without_config_raises(tmp_path):
     (tmp_path / "ds").mkdir()
     with pytest.raises(DatasetError):
         cli._resolve_data_yaml(str(tmp_path / "ds"))
+
+
+def test_cli_skips_a_model_with_no_shared_classes(tmp_path, monkeypatch, capsys):
+    """The CLI must not score (or record) a model that cannot be compared."""
+    cli = _load_cli()
+    data_yaml = _make_dataset(tmp_path / "ds")  # dataset classes: fish, shark
+
+    class _MismatchDetector:
+        device = "cpu"
+
+        def get_class_names(self, model_selection=None):
+            return {(model_selection or "m"): {0: "dolphin"}}
+
+        def resolve_keys(self, selection):
+            return [selection]
+
+        def predict_image(self, *args, **kwargs):  # pragma: no cover - guard
+            raise AssertionError("inference must not run for an incompatible model")
+
+    import app.detection.detector as detector_module
+
+    monkeypatch.setattr(
+        detector_module, "MarineDetector", lambda settings=None: _MismatchDetector()
+    )
+
+    code = cli.main(["--data", str(data_yaml), "--split", "test", "--model", "dolphin"])
+    captured = capsys.readouterr()
+    assert code == 3  # nothing valid was evaluated -> pending, not a score
+    assert "shares no class names" in captured.out
+    assert "No model could be evaluated" in captured.err

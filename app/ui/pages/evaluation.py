@@ -468,6 +468,16 @@ def _run_section(detector, settings, store: EvaluationStore, user_id: str) -> No
                 "Dataset has no class names",
                 "Its data.yaml does not define 'names', so labels cannot be scored.",
             )
+        elif not _any_comparable_model(registry, list(selections), option.class_names):
+            error_card(
+                st,
+                "No selected model can be scored on this dataset",
+                f"None of the selected models share a class name with "
+                f"'{option.name}' ({', '.join(option.class_names)}). BlueEye will "
+                "not turn mismatched labels into a score. Choose a model whose "
+                "classes match the dataset, or register a dataset with matching "
+                "classes.",
+            )
         else:
             _start_run(
                 detector=detector,
@@ -642,6 +652,28 @@ def _live_progress(store: EvaluationStore, user_id: str, experiment_id: str) -> 
     if record is None:
         return
     _render_progress(record, is_running(experiment_id))
+
+
+def _any_comparable_model(
+    registry: dict, selections: list[str], dataset_classes: tuple
+) -> bool:
+    """True when at least one selected model can be scored on this dataset.
+
+    A model whose classes are unknown yet (weights not inspected) is treated as
+    possibly compatible, so the worker still gets a chance to decide.
+    """
+    if not dataset_classes:
+        return True
+    for key in selections:
+        spec = registry.get(key)
+        classes = (
+            tuple(getattr(spec, "classes", ()) or ()) if spec is not None else ()
+        )
+        if not classes:
+            return True
+        if compare_classes(dataset_classes, classes).comparable:
+            return True
+    return False
 
 
 def _active_panel(settings, store, user_id, active: list) -> None:
@@ -1107,11 +1139,24 @@ def _experiments_section(settings, store: EvaluationStore, user_id: str) -> None
             st.rerun()
 
 
+def _effective_status(record) -> tuple[str, str]:
+    """Display status + badge kind for a stored experiment.
+
+    A run whose stored results are *all* non-comparable is shown as
+    "not comparable" instead of the raw status, so a historical record that
+    was stamped ``completed`` cannot masquerade as a measured score.
+    """
+    if record.results and not any(result.comparable for result in record.results):
+        return "not comparable", "warn"
+    return record.status, _STATUS_KIND.get(record.status, "info")
+
+
 def _render_experiment(
     settings, store: EvaluationStore, user_id: str, record
 ) -> None:
+    status_label, status_kind = _effective_status(record)
     st.markdown(
-        badge(record.status, _STATUS_KIND.get(record.status, "info"), dot=True)
+        badge(status_label, status_kind, dot=True)
         + f" &nbsp; **{record.name}**",
         unsafe_allow_html=True,
     )
@@ -1120,6 +1165,14 @@ def _render_experiment(
         f"fingerprint {record.dataset_fingerprint[:12] or 'n/a'} · "
         f"created {record.created_at}"
     )
+    if record.results and not any(result.comparable for result in record.results):
+        notice(
+            st,
+            "warning",
+            "Not a valid comparison",
+            "None of this run's models share a class name with the dataset, so "
+            "any zeros below mean 'not computed', not a measured score.",
+        )
     if record.purpose:
         st.markdown(f"**Purpose:** {record.purpose}")
     if record.notes:
@@ -1322,20 +1375,36 @@ def _rerun_command(record) -> str:
         f"--split {record.split or 'test'}",
         model_flags,
     ]
+
+    # The UI stores ``max_images``/``confidence``; the CLI stores ``limit``/
+    # ``confidence_override``. Reproduce whichever is present.
     limit = parameters.get("max_images")
+    if limit is None:
+        limit = parameters.get("limit")
     if isinstance(limit, int) and limit > 0:
         parts.append(f"--limit {limit}")
+
     iou = parameters.get("iou_threshold_for_figures")
     if isinstance(iou, (int, float)):
         parts.append(f"--iou {float(iou):g}")
+
     confidence = parameters.get("confidence")
+    if confidence is None:
+        confidence = parameters.get("confidence_override")
     if isinstance(confidence, (int, float)):
         parts.append(f"--confidence {float(confidence):g}")
+
     device = parameters.get("device")
     if isinstance(device, str) and device and device != "auto":
         parts.append(f"--device {device}")
+
     if parameters.get("plots"):
         parts.append("--plots")
+
+    name = str(getattr(record, "name", "") or "").replace('"', "'").strip()
+    if name:
+        parts.append(f'--name "{name}"')
+
     parts.append(f"--record --owner {record.user_id}")
     return " ".join(parts)
 

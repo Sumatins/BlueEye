@@ -520,6 +520,7 @@ def test_rerun_command_matches_cli_end_to_end() -> None:
         split="test",
         model_keys=("fish_inv", "megafauna"),
         user_id="u1",
+        name="Reef comparison",
         parameters={
             "max_images": 25,
             "iou_threshold_for_figures": 0.75,
@@ -538,6 +539,7 @@ def test_rerun_command_matches_cli_end_to_end() -> None:
     assert "--confidence 0.4" in command
     assert "--device cpu" in command
     assert "--plots" in command
+    assert '--name "Reef comparison"' in command
     assert "--record --owner u1" in command
 
     # The generated command really parses with the CLI's own argument parser.
@@ -554,8 +556,37 @@ def test_rerun_command_matches_cli_end_to_end() -> None:
     assert args.confidence == pytest.approx(0.4)
     assert args.device == "cpu"
     assert args.plots is True
+    assert args.name == "Reef comparison"
     assert args.record is True
     assert args.owner == "u1"
+
+
+def test_rerun_command_reads_cli_style_parameters() -> None:
+    """Runs recorded by the CLI store limit/confidence under different keys."""
+    import shlex
+
+    from app.ui.pages import evaluation as page
+
+    record = types.SimpleNamespace(
+        data_yaml="data/raw/synthetic_marine/data.yaml",
+        split="test",
+        model_keys=("megafauna",),
+        user_id="f2ef",
+        name="CLI evaluation synthetic_marine test",
+        parameters={
+            "limit": 12,
+            "confidence_override": 0.35,
+            "iou_threshold_for_figures": 0.5,
+            "device": "cpu",
+            "selections": ["megafauna"],
+        },
+    )
+    command = page._rerun_command(record)
+    assert "--limit 12" in command
+    assert "--confidence 0.35" in command
+    assert "--iou 0.5" in command
+    # Round-trips through a real shell split (quoted name included).
+    assert shlex.split(command)[0] == "python"
 
 
 def test_rerun_command_omits_unset_settings() -> None:
@@ -575,3 +606,70 @@ def test_rerun_command_omits_unset_settings() -> None:
     assert "--confidence" not in command
     assert "--device" not in command
     assert "--plots" not in command
+
+
+# --------------------------------------------------------------------------- #
+# Non-comparable models: never scored, never reported as completed
+# --------------------------------------------------------------------------- #
+def test_run_skips_a_model_with_no_shared_classes(tmp_path: Path) -> None:
+    store = EvaluationStore(tmp_path / "eval.db")
+    data_yaml = make_dataset(tmp_path / "ds")  # dataset classes: ("fish",)
+    record = _register_owned(store, "u1", data_yaml)
+    experiment = store.create_experiment("u1", "mismatch", dataset_id=record.id)
+
+    request = ExperimentRequest(
+        experiment_id=experiment.id,
+        user_id="u1",
+        data_yaml=str(data_yaml),
+        split="test",
+        model_keys=("dolphin_model",),
+        confidence=None,
+        iou_threshold=0.5,
+        limit=None,
+        output_dir=tmp_path / "out",
+        make_plots=False,
+    )
+    detector = _FakeDetector(classes=("dolphin",))  # shares nothing with "fish"
+    assert run_experiment(store, request, detector=detector) == "failed"
+
+    loaded = store.get_experiment(experiment.id, "u1")
+    assert loaded is not None
+    # A model that cannot be compared must not be stored as a measured result.
+    assert loaded.status == "failed"
+    assert loaded.results == ()
+    assert any("no class names" in warning.lower() for warning in loaded.warnings)
+
+
+def test_effective_status_flags_incomparable_runs() -> None:
+    from app.ui.pages.evaluation import _effective_status
+
+    def result(comparable: bool):
+        return types.SimpleNamespace(comparable=comparable)
+
+    ok = types.SimpleNamespace(status="completed", results=(result(True),))
+    assert _effective_status(ok) == ("completed", "ok")
+
+    # All results non-comparable -> never presented as a completed score.
+    bad = types.SimpleNamespace(status="completed", results=(result(False),))
+    assert _effective_status(bad) == ("not comparable", "warn")
+
+    # A run with no stored results keeps its own status.
+    empty = types.SimpleNamespace(status="failed", results=())
+    assert _effective_status(empty) == ("failed", "error")
+
+
+def test_any_comparable_model_helper() -> None:
+    from app.ui.pages.evaluation import _any_comparable_model
+
+    class _Spec:
+        def __init__(self, classes):
+            self.classes = tuple(classes)
+
+    registry = {"a": _Spec(("dolphin",)), "b": _Spec(("fish",))}
+    # The only selected model is incompatible -> block the run.
+    assert _any_comparable_model(registry, ["a"], ("fish",)) is False
+    # One compatible model among the selection -> allow it.
+    assert _any_comparable_model(registry, ["a", "b"], ("fish",)) is True
+    # No dataset classes / unknown model classes -> the worker decides.
+    assert _any_comparable_model(registry, ["a"], ()) is True
+    assert _any_comparable_model({"c": _Spec(())}, ["c"], ("fish",)) is True
