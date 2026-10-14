@@ -265,3 +265,55 @@ def test_stored_evaluation_run_is_rendered_for_its_owner(app_env) -> None:
     ]
     assert any(label.startswith("Results (JSON)") for label in download_labels)
 
+
+def _seed_running_run(user_id: str, name: str) -> str:
+    """Create a *running* experiment carrying real progress counters."""
+    from app.evaluation.experiments import EvaluationStore
+
+    store = EvaluationStore(get_settings().evaluation_db_path)
+    experiment = store.create_experiment(
+        user_id,
+        name,
+        dataset_name="tiny",
+        data_yaml="tiny/data.yaml",
+        split="test",
+        class_names=("scaridae",),
+        status="running",
+    )
+    store.set_status(
+        experiment.id,
+        user_id,
+        "running",
+        progress={
+            "stage": "inference",
+            "model": "fish_inv",
+            "model_index": 1,
+            "images_done": 3,
+            "images_total": 5,
+            "completed": 0,
+            "requested": 1,
+        },
+    )
+    return experiment.id
+
+
+def test_running_experiment_shows_live_progress(app_env) -> None:
+    at = _register(_app("evaluation"))
+    user_id = at.session_state["be_auth_user_id"]
+    _seed_running_run(user_id, "Live Run")
+
+    at = _goto(at, "evaluation")
+    # The active run is rendered in the Experiments section (the Run section
+    # only shows the live panel once a dataset is registered).
+    _by_key(at.radio, "eval_section").set_value("Experiments")
+    at = at.run()
+
+    assert not at.exception, at.exception
+    blob = _rendered_text(at)
+    assert "Live Run" in blob
+    # Genuine counters from the stored progress, not invented values.
+    assert "running inference" in blob.lower()
+    assert "3/5 images" in blob
+    # A running experiment must never claim stored results.
+    assert "no measured results are stored" in blob.lower()
+

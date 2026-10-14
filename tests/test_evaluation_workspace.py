@@ -10,6 +10,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 from __future__ import annotations
 
+import types
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -24,6 +26,7 @@ from app.evaluation.experiments import (
 )
 from app.evaluation.jobs import (
     ExperimentRequest,
+    _Progress,
     _final_status,
     is_running,
     run_experiment,
@@ -259,6 +262,96 @@ def test_run_fails_when_the_split_cannot_be_loaded(tmp_path: Path) -> None:
     assert loaded is not None and loaded.status == "failed" and loaded.error
 
 
+def _stored_progress(store: EvaluationStore, experiment_id: str) -> dict:
+    record = store.get_experiment(experiment_id, "u1")
+    assert record is not None
+    return record.progress
+
+
+def test_progress_reporter_throttles_but_forces_stage(tmp_path: Path) -> None:
+    store = EvaluationStore(tmp_path / "eval.db")
+    experiment = store.create_experiment("u1", "run")
+
+    reporter = _Progress(store, experiment.id, "u1", 2, min_interval=60.0)
+    reporter.stage("inference", model="fake", images_done=1, images_total=10)
+    assert _stored_progress(store, experiment.id)["images_done"] == 1
+
+    # A counter update inside the throttle window is deliberately not written...
+    reporter.update(images_done=2)
+    assert _stored_progress(store, experiment.id)["images_done"] == 1
+
+    # ...but a stage transition is always flushed immediately.
+    reporter.stage("report", images_done=10)
+    stored = _stored_progress(store, experiment.id)
+    assert stored["stage"] == "report"
+    assert stored["images_done"] == 10
+
+
+def test_run_experiment_persists_live_stage_and_counters(tmp_path: Path) -> None:
+    store = EvaluationStore(tmp_path / "eval.db")
+    data_yaml = make_dataset(tmp_path / "ds")
+    record = _register_owned(store, "u1", data_yaml)
+    experiment = store.create_experiment("u1", "run", dataset_id=record.id)
+
+    request = ExperimentRequest(
+        experiment_id=experiment.id,
+        user_id="u1",
+        data_yaml=str(data_yaml),
+        split="test",
+        model_keys=("fake",),
+        confidence=None,
+        iou_threshold=0.5,
+        limit=None,
+        output_dir=tmp_path / "out",
+        make_plots=False,
+    )
+    assert run_experiment(store, request, detector=_FakeDetector()) == "completed"
+
+    progress = _stored_progress(store, experiment.id)
+    assert progress["requested"] == 1
+    assert progress["completed"] == 1
+    assert progress["images_total"] == 1
+    assert progress["stage"] == "report"
+
+
+def test_progress_view_derives_images_percent_elapsed_and_eta() -> None:
+    from app.ui.pages import evaluation as page
+
+    started = (datetime.now(tz=timezone.utc) - timedelta(seconds=20)).strftime(
+        "%Y-%m-%dT%H:%M:%S.%f%z"
+    )
+    record = types.SimpleNamespace(
+        progress={
+            "stage": "inference",
+            "images_done": 5,
+            "images_total": 10,
+            "completed": 0,
+            "requested": 2,
+        },
+        started_at=started,
+    )
+    view = page._progress_view(record)
+    assert view["fraction"] == pytest.approx(0.5)
+    assert view["counter_label"] == "5/10 images"
+    assert view["stage_label"] == "Running inference"
+    assert view["elapsed"] == pytest.approx(20, abs=5)
+    assert view["eta"] == pytest.approx(20, abs=6)  # roughly as long again
+
+
+def test_progress_view_falls_back_to_models_without_eta() -> None:
+    from app.ui.pages import evaluation as page
+
+    record = types.SimpleNamespace(
+        progress={"stage": "loading model", "completed": 1, "requested": 4},
+        started_at=None,
+    )
+    view = page._progress_view(record)
+    assert view["fraction"] == pytest.approx(0.25)
+    assert view["counter_label"] == "1/4 models"
+    assert view["elapsed"] is None
+    assert view["eta"] is None
+
+
 def test_final_status_matrix() -> None:
     assert _final_status(2, 2, False) == "completed"
     assert _final_status(1, 2, False) == "partially_completed"
@@ -403,3 +496,82 @@ def test_comparability_warnings_flag_differences() -> None:
     assert "different datasets" in warnings
     assert "different splits" in warnings
     assert "class mappings differ" in warnings
+
+
+# --------------------------------------------------------------------------- #
+# CLI reproduction command
+# --------------------------------------------------------------------------- #
+def test_rerun_command_matches_cli_end_to_end() -> None:
+    """The displayed command must use flags the CLI actually accepts."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "run_evaluation_cli_workspace",
+        Path(__file__).resolve().parents[1] / "scripts" / "run_evaluation.py",
+    )
+    cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cli)
+    parser = cli.build_parser()
+
+    from app.ui.pages import evaluation as page
+
+    record = types.SimpleNamespace(
+        data_yaml="data/raw/tiny/data.yaml",
+        split="test",
+        model_keys=("fish_inv", "megafauna"),
+        user_id="u1",
+        parameters={
+            "max_images": 25,
+            "iou_threshold_for_figures": 0.75,
+            "confidence": 0.4,
+            "device": "cpu",
+            "plots": True,
+        },
+    )
+    command = page._rerun_command(record)
+
+    assert '--data "data/raw/tiny/data.yaml"' in command
+    assert "--split test" in command
+    assert "--model fish_inv --model megafauna" in command
+    assert "--limit 25" in command
+    assert "--iou 0.75" in command
+    assert "--confidence 0.4" in command
+    assert "--device cpu" in command
+    assert "--plots" in command
+    assert "--record --owner u1" in command
+
+    # The generated command really parses with the CLI's own argument parser.
+    import shlex
+
+    argv = shlex.split(command)
+    assert argv[0] == "python"
+    args = parser.parse_args(argv[2:])
+    assert args.data == "data/raw/tiny/data.yaml"
+    assert args.split == "test"
+    assert args.model == ["fish_inv", "megafauna"]
+    assert args.limit == 25
+    assert args.iou == pytest.approx(0.75)
+    assert args.confidence == pytest.approx(0.4)
+    assert args.device == "cpu"
+    assert args.plots is True
+    assert args.record is True
+    assert args.owner == "u1"
+
+
+def test_rerun_command_omits_unset_settings() -> None:
+    from app.ui.pages import evaluation as page
+
+    record = types.SimpleNamespace(
+        data_yaml="d/data.yaml",
+        split="val",
+        model_keys=(),
+        user_id="u2",
+        parameters={},
+    )
+    command = page._rerun_command(record)
+    assert "--model all" in command
+    assert "--limit" not in command
+    assert "--iou" not in command
+    assert "--confidence" not in command
+    assert "--device" not in command
+    assert "--plots" not in command

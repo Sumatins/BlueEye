@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -127,6 +128,69 @@ def _final_status(complete: int, requested: int, cancelled: bool) -> str:
     return "failed"
 
 
+class _Progress:
+    """Throttled writer of genuine live progress into the experiment row.
+
+    The evaluator calls this from the worker thread with real counters only.
+    Writes are coalesced to at most one per ``min_interval`` seconds so a fast
+    dataset does not hammer SQLite, while stage transitions are always flushed
+    immediately. A failed progress write never aborts the run: the metrics
+    matter more than the progress row.
+    """
+
+    def __init__(
+        self,
+        store: EvaluationStore,
+        experiment_id: str,
+        user_id: str,
+        models_total: int,
+        *,
+        min_interval: float = 1.0,
+    ) -> None:
+        self._store = store
+        self._experiment_id = experiment_id
+        self._user_id = user_id
+        self._min_interval = max(0.0, float(min_interval))
+        self._last_write = 0.0
+        self._state: dict = {
+            "stage": "preparing",
+            "models_total": int(models_total),
+            "completed": 0,
+            "requested": int(models_total),
+        }
+
+    @property
+    def state(self) -> dict:
+        return dict(self._state)
+
+    def stage(self, stage: str, **extra) -> None:
+        """Record a stage transition and persist it immediately."""
+        self._state["stage"] = stage
+        self._state.update(extra)
+        self._write(force=True)
+
+    def update(self, **extra) -> None:
+        """Merge counters and persist, throttled to ``min_interval``."""
+        self._state.update(extra)
+        self._write()
+
+    def _write(self, *, force: bool = False) -> None:
+        now = time.monotonic()
+        if not force and (now - self._last_write) < self._min_interval:
+            return
+        self._last_write = now
+        try:
+            self._store.set_status(
+                self._experiment_id,
+                self._user_id,
+                "running",
+                progress=dict(self._state),
+            )
+        except Exception:  # noqa: BLE001 - progress must never abort a run
+            logger.debug("Could not persist evaluation progress", exc_info=True)
+
+
+
 def run_experiment(
     store: EvaluationStore, request: ExperimentRequest, *, detector
 ) -> str:
@@ -151,6 +215,14 @@ def run_experiment(
         return "cancelled"
 
     store.set_status(request.experiment_id, request.user_id, "running")
+    progress = _Progress(
+        store, request.experiment_id, request.user_id, len(request.model_keys)
+    )
+    progress.stage(
+        "loading dataset",
+        data_yaml=str(request.data_yaml),
+        split=request.split,
+    )
 
     try:
         dataset = load_split(request.data_yaml, request.split)
@@ -177,9 +249,17 @@ def run_experiment(
 
     from app.evaluation import plots as plots_module
 
-    for key in request.model_keys:
+    for index, key in enumerate(request.model_keys):
         if event.is_set():
             break
+        progress.stage(
+            "loading model",
+            model=key,
+            model_index=index + 1,
+            completed=complete,
+            images_done=0,
+            images_total=dataset.num_images,
+        )
         try:
             classes = model_class_names(detector, key)
         except Exception as exc:  # noqa: BLE001 - recorded, never fatal
@@ -198,9 +278,24 @@ def run_experiment(
         predict = detector_predictor(
             detector, model_selection=key, confidence=request.confidence
         )
+
+        def _on_progress(stage, done, total, _key=key, _index=index):
+            progress.update(
+                stage=stage,
+                model=_key,
+                model_index=_index + 1,
+                images_done=done,
+                images_total=total,
+                completed=complete,
+            )
+
         try:
             evaluation = run_evaluation(
-                key, _guarded(predict, event), dataset, classes
+                key,
+                _guarded(predict, event),
+                dataset,
+                classes,
+                on_progress=_on_progress,
             )
         except CancelSignal:
             break
@@ -218,11 +313,11 @@ def run_experiment(
         store.add_model_result(request.experiment_id, request.user_id, evaluation)
         evaluations.append(evaluation)
         complete += 1
-        store.set_status(
-            request.experiment_id,
-            request.user_id,
-            "running",
-            progress={"completed": complete, "requested": requested},
+        progress.stage(
+            "inference",
+            completed=complete,
+            images_done=dataset.num_images,
+            images_total=dataset.num_images,
         )
 
         if request.make_plots:
@@ -244,6 +339,12 @@ def run_experiment(
 
     cancelled = event.is_set()
     _forget(request.experiment_id)
+
+    progress.stage(
+        "report",
+        images_done=dataset.num_images,
+        images_total=dataset.num_images,
+    )
 
     # Persist the report from the *actual* evaluations produced this run.
     environment = collect_environment()
@@ -275,7 +376,7 @@ def run_experiment(
         errors.append(f"Report generation failed: {exc}")
         report_paths = []
 
-    final = _final_status(complete, len(request.model_keys), cancelled)
+    final = _final_status(complete, requested, cancelled)
     store.set_status(
         request.experiment_id,
         request.user_id,

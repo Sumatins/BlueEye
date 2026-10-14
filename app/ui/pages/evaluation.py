@@ -33,7 +33,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import streamlit as st
@@ -133,6 +133,19 @@ _ARTIFACT_LABELS = {
     "summary.md": "Summary (Markdown)",
     "report.html": "Report (HTML)",
 }
+
+#: Human wording for the stages the worker records while a run is live.
+_STAGE_LABELS = {
+    "preparing": "Preparing",
+    "loading dataset": "Loading dataset",
+    "loading model": "Loading model",
+    "inference": "Running inference",
+    "metric calculation": "Calculating metrics",
+    "report": "Writing report",
+}
+
+#: How often the live progress block re-reads the job state (seconds).
+PROGRESS_REFRESH_SECONDS = 2.0
 
 
 # --------------------------------------------------------------------------- #
@@ -512,28 +525,135 @@ def _compat_panel(registry: dict, selections: list[str], dataset_classes: tuple)
             )
 
 
+def _parse_timestamp(value: str | None) -> datetime | None:
+    """Parse a stored UTC timestamp, tolerating aware/naive variants."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        for fmt in ("%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z"):
+            try:
+                parsed = datetime.strptime(value, fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _format_duration(seconds: float) -> str:
+    seconds = max(0.0, float(seconds))
+    if seconds < 60:
+        return f"{seconds:.0f}s"
+    minutes, rest = divmod(int(seconds), 60)
+    if minutes < 60:
+        return f"{minutes}m {rest:02d}s"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes:02d}m"
+
+
+def _progress_view(record) -> dict:
+    """Derive display values from a record's *stored* progress counters."""
+    progress = record.progress or {}
+    stage = str(progress.get("stage") or "")
+    done = progress.get("images_done")
+    total = progress.get("images_total")
+    completed = progress.get("completed")
+    requested = progress.get("requested")
+
+    fraction: float | None = None
+    counter_label = ""
+    if (
+        stage in ("inference", "metric calculation")
+        and isinstance(total, int)
+        and total > 0
+        and isinstance(done, int)
+    ):
+        fraction = done / total
+        counter_label = f"{done}/{total} images"
+    elif isinstance(completed, int) and isinstance(requested, int) and requested > 0:
+        fraction = completed / requested
+        counter_label = f"{completed}/{requested} models"
+
+    elapsed: float | None = None
+    eta: float | None = None
+    started = _parse_timestamp(record.started_at)
+    if started is not None:
+        elapsed = (datetime.now(tz=timezone.utc) - started).total_seconds()
+        if elapsed > 0 and fraction is not None and 0 < fraction < 1:
+            eta = elapsed * (1 - fraction) / fraction
+
+    return {
+        "stage": stage,
+        "stage_label": _STAGE_LABELS.get(stage, stage),
+        "model": progress.get("model"),
+        "model_index": progress.get("model_index"),
+        "requested": requested,
+        "counter_label": counter_label,
+        "fraction": fraction,
+        "elapsed": elapsed,
+        "eta": eta,
+    }
+
+
+def _render_progress(record, live: bool) -> None:
+    """Render one experiment's genuine progress (bar + counters + timing)."""
+    view = _progress_view(record)
+    fraction = view["fraction"]
+    if isinstance(fraction, float):
+        st.progress(min(max(fraction, 0.0), 1.0))
+
+    parts: list[str] = []
+    if view["stage_label"]:
+        parts.append(view["stage_label"])
+    model = view["model"]
+    if model:
+        if isinstance(view["model_index"], int) and isinstance(view["requested"], int):
+            parts.append(f"model {model} ({view['model_index']}/{view['requested']})")
+        else:
+            parts.append(f"model {model}")
+    if view["counter_label"]:
+        parts.append(view["counter_label"])
+    if view["elapsed"] is not None:
+        parts.append(f"elapsed {_format_duration(view['elapsed'])}")
+    if view["eta"] is not None:
+        parts.append(f"~{_format_duration(view['eta'])} remaining")
+    if parts:
+        st.caption(" · ".join(parts))
+    if not live:
+        st.caption(
+            "No live worker is running in this process (the app may have "
+            "restarted). Cancel it to unblock new runs."
+        )
+
+
+@st.fragment(run_every=PROGRESS_REFRESH_SECONDS)
+def _live_progress(store: EvaluationStore, user_id: str, experiment_id: str) -> None:
+    """Auto-refreshing progress for one running experiment.
+
+    Re-reads the persisted row so the numbers come from the worker, not from
+    the page that happened to start the run.
+    """
+    record = store.get_experiment(experiment_id, user_id)
+    if record is None:
+        return
+    _render_progress(record, is_running(experiment_id))
+
+
 def _active_panel(settings, store, user_id, active: list) -> None:
     st.markdown("#### Runs in progress")
     for record in active:
         running = is_running(record.id)
-        progress = record.progress or {}
-        finished = progress.get("completed")
-        requested = progress.get("requested")
-        detail = (
-            f"{finished}/{requested} models done"
-            if isinstance(finished, int) and isinstance(requested, int)
-            else "starting..."
-        )
         st.markdown(
             badge(record.status, _STATUS_KIND.get(record.status, "info"), dot=True)
-            + f" **{record.name}** · {detail}",
+            + f" **{record.name}**",
             unsafe_allow_html=True,
         )
-        if not running:
-            st.caption(
-                "No live worker is running in this process (the app may have "
-                "restarted). Cancel it to unblock new runs."
-            )
+        _live_progress(store, user_id, record.id)
         c1, c2 = st.columns(2)
         with c1:
             if st.button("Cancel run", key=f"eval_cancel_{record.id}", width="stretch"):
@@ -561,8 +681,8 @@ def _active_panel(settings, store, user_id, active: list) -> None:
                 )
                 st.rerun()
     st.caption(
-        "A run continues in the background. Refresh the Experiments section to "
-        "see its final status and results."
+        "Progress updates live from the background worker. A finished run can be "
+        "reopened from the Experiments section."
     )
 
 
@@ -583,6 +703,18 @@ def _start_run(
     purpose: str,
     notes: str,
 ) -> None:
+    # Server-side re-check: the button is disabled while a run is active, but a
+    # double submit or a second tab must not start a second worker for the same
+    # account. One evaluation at a time keeps progress and metrics honest.
+    if store.list_experiments(user_id, statuses=ACTIVE_STATUSES, limit=1):
+        error_card(
+            st,
+            "A run is already in progress",
+            "BlueEye runs one evaluation at a time. Cancel it or wait for it to "
+            "finish (the Experiments section shows live progress), then retry.",
+        )
+        return
+
     with st.spinner("Validating the dataset before running..."):
         try:
             validation = validate_dataset(option.data_yaml, split=split)
@@ -1172,12 +1304,40 @@ def _reproducibility(record) -> None:
 
 
 def _rerun_command(record) -> str:
-    model_arg = ",".join(record.model_keys) if record.model_keys else "all"
-    return (
-        f"python scripts/run_evaluation.py --data \"{record.data_yaml}\" "
-        f"--split {record.split or 'test'} --model {model_arg} "
-        f"--record --owner {record.user_id}"
+    """A CLI command that reproduces this run from its *saved* configuration.
+
+    Built from the persisted experiment row (dataset, split, models and the
+    stored ``parameters``), never from the current form values, and only with
+    flags the CLI actually supports.
+    """
+    parameters = record.parameters or {}
+    model_flags = (
+        " ".join(f"--model {key}" for key in record.model_keys)
+        if record.model_keys
+        else "--model all"
     )
+    parts = [
+        "python scripts/run_evaluation.py",
+        f'--data "{record.data_yaml}"',
+        f"--split {record.split or 'test'}",
+        model_flags,
+    ]
+    limit = parameters.get("max_images")
+    if isinstance(limit, int) and limit > 0:
+        parts.append(f"--limit {limit}")
+    iou = parameters.get("iou_threshold_for_figures")
+    if isinstance(iou, (int, float)):
+        parts.append(f"--iou {float(iou):g}")
+    confidence = parameters.get("confidence")
+    if isinstance(confidence, (int, float)):
+        parts.append(f"--confidence {float(confidence):g}")
+    device = parameters.get("device")
+    if isinstance(device, str) and device and device != "auto":
+        parts.append(f"--device {device}")
+    if parameters.get("plots"):
+        parts.append("--plots")
+    parts.append(f"--record --owner {record.user_id}")
+    return " ".join(parts)
 
 
 # --------------------------------------------------------------------------- #

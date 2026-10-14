@@ -28,6 +28,10 @@ from app.evaluation.metrics import DetectionBox, EvaluationResult, evaluate
 #: ``(class_name, confidence, (x1, y1, x2, y2))`` in pixel coordinates.
 Prediction = tuple[str, float, tuple[float, float, float, float]]
 Predictor = Callable[[Path], list[Prediction]]
+#: ``(stage, images_done, images_total)`` progress notification for one model.
+#: Called from the worker thread with *genuine* counters only; it may be called
+#: often, so a handler should throttle any expensive work (e.g. a DB write).
+ProgressHook = Callable[[str, int, int], None]
 
 
 class InferenceError(RuntimeError):
@@ -111,12 +115,19 @@ def run_evaluation(
     predictor: Predictor,
     dataset: DatasetSplit,
     model_classes: Sequence[str],
+    *,
+    on_progress: ProgressHook | None = None,
 ) -> ModelEvaluation:
     """Evaluate ``predictor`` on ``dataset`` and return the metrics.
 
     Only class names present in both the model and the dataset are scored;
     predictions of unknown classes are dropped (an unknown name can never be
     mapped to a dataset label by guessing).
+
+    ``on_progress``, when given, is called as ``(stage, images_done,
+    images_total)`` with real counters: ``"inference"`` before the loop, after
+    every image, and ``"metric calculation"`` once the loop has finished and the
+    metrics are about to be computed. It is never called with invented values.
     """
     compat = compare_classes(dataset.class_names, model_classes)
     name_to_id = {_normalise(name): index for index, name in enumerate(dataset.class_names)}
@@ -124,6 +135,9 @@ def run_evaluation(
     predictions: dict[str, list[DetectionBox]] = {}
     num_predictions = 0
     evaluated = 0
+    total_images = dataset.num_images
+    if on_progress is not None:
+        on_progress("inference", 0, total_images)
     started = time.perf_counter()
     for image_path in dataset.images:
         try:
@@ -151,8 +165,12 @@ def run_evaluation(
         predictions[image_path.name] = boxes
         num_predictions += len(boxes)
         evaluated += 1
+        if on_progress is not None:
+            on_progress("inference", evaluated, total_images)
     elapsed = time.perf_counter() - started
 
+    if on_progress is not None:
+        on_progress("metric calculation", evaluated, total_images)
     metrics = evaluate(
         dataset.ground_truth,
         predictions,

@@ -194,6 +194,28 @@ def test_run_evaluation_with_stub_predictor(tmp_path):
     assert evaluation.num_predictions == 3
 
 
+def test_run_evaluation_reports_genuine_progress(tmp_path):
+    dataset = load_split(_make_dataset(tmp_path / "ds"), split="test")
+    events: list[tuple[str, int, int]] = []
+    evaluation = run_evaluation(
+        "stub",
+        _perfect_predictor(dataset),
+        dataset,
+        dataset.class_names,
+        on_progress=lambda stage, done, total: events.append((stage, done, total)),
+    )
+    assert evaluation.images_evaluated == 2
+
+    inference = [event for event in events if event[0] == "inference"]
+    # Starts at zero and advances one *real* image at a time to the real total.
+    assert inference[0] == ("inference", 0, 2)
+    assert inference[-1] == ("inference", 2, 2)
+    assert [done for _, done, _ in inference] == [0, 1, 2]
+    assert all(total == 2 for _, _, total in inference)
+    # The last notification marks the real metric phase, still with real counts.
+    assert events[-1] == ("metric calculation", 2, 2)
+
+
 def test_run_evaluation_marks_not_comparable(tmp_path):
     dataset = load_split(_make_dataset(tmp_path / "ds"), split="test")
     evaluation = run_evaluation(
