@@ -13,6 +13,102 @@ from __future__ import annotations
 
 #: species id -> {url, credit, license, license_url, source_page, title}
 SPECIES_IMAGES: dict[str, dict[str, str]] = {
+    "albacore_tuna": {
+        "credit": "User:Pvmoutside",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Thunnus_alalunga.jpg",
+        "title": "File:Thunnus alalunga.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/9/97/Thunnus_alalunga.jpg"
+    },
+    "bengal_monitor": {
+        "credit": "Carlos Delgado",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Varanus_bengalensis_-_01.jpg",
+        "title": "File:Varanus bengalensis - 01.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/39/Varanus_bengalensis_-_01.jpg/960px-Varanus_bengalensis_-_01.jpg"
+    },
+    "bigeye_tuna": {
+        "credit": "Bernard Frink, BCF",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Thunnus_obesus.jpg",
+        "title": "File:Thunnus obesus.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d8/Thunnus_obesus.jpg/960px-Thunnus_obesus.jpg"
+    },
+    "bighead_carp": {
+        "credit": "KENPEI",
+        "license": "CC BY-SA 3.0",
+        "license_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Hypophthalmichthys_nobilis2.jpg",
+        "title": "File:Hypophthalmichthys nobilis2.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8b/Hypophthalmichthys_nobilis2.jpg/960px-Hypophthalmichthys_nobilis2.jpg"
+    },
+    "black_carp": {
+        "credit": "Leo Nico, (United States Geological Survey) (Original uploader was Zp at cs.wikipedia)",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Mylopharyngodon_piceus.jpg",
+        "title": "File:Mylopharyngodon piceus.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/e/ec/Mylopharyngodon_piceus.jpg"
+    },
+    "blacktip_reef_shark": {
+        "credit": "S. Raredon",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Carcharhinus_melanopterus_jaws.jpg",
+        "title": "File:Carcharhinus melanopterus jaws.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/0/0a/Carcharhinus_melanopterus_jaws.jpg"
+    },
+    "blue_spotted_stingray": {
+        "credit": "Diego Delso",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Raya_de_arrecife_(Taeniura_lymma),_mar_Rojo,_Egipto,_2023-04-14,_DD_60.jpg",
+        "title": "File:Raya de arrecife (Taeniura lymma), mar Rojo, Egipto, 2023-04-14, DD 60.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f4/Raya_de_arrecife_%28Taeniura_lymma%29%2C_mar_Rojo%2C_Egipto%2C_2023-04-14%2C_DD_60.jpg/960px-Raya_de_arrecife_%28Taeniura_lymma%29%2C_mar_Rojo%2C_Egipto%2C_2023-04-14%2C_DD_60.jpg"
+    },
+    "blue_tilapia": {
+        "credit": "Michael Rupert Hayes",
+        "license": "CC BY-SA 2.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/2.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Blue_Tilapia.jpg",
+        "title": "File:Blue Tilapia.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Blue_Tilapia.jpg/960px-Blue_Tilapia.jpg"
+    },
+    "blue_whale": {
+        "credit": "NOAA United States. National Marine Fisheries Service",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Balaenoptera_musculus_NOAA.jpg",
+        "title": "File:Balaenoptera musculus NOAA.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/97/Balaenoptera_musculus_NOAA.jpg/960px-Balaenoptera_musculus_NOAA.jpg"
+    },
+    "bluebarred_parrotfish": {
+        "credit": "Gonzalo Ganda Álvarez",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Scarus_ghobban_438034326.jpg",
+        "title": "File:Scarus ghobban 438034326.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Scarus_ghobban_438034326.jpg/960px-Scarus_ghobban_438034326.jpg"
+    },
+    "bottlenose_dolphin": {
+        "credit": "NASA",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Tursiops_truncatus_01.jpg",
+        "title": "File:Tursiops truncatus 01.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/10/Tursiops_truncatus_01.jpg/960px-Tursiops_truncatus_01.jpg"
+    },
+    "bull_shark": {
+        "credit": "Brenda Bowling, tpwd.texas.gov",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Carcharhinus_leucas_TPWD.jpg",
+        "title": "File:Carcharhinus leucas TPWD.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/1/12/Carcharhinus_leucas_TPWD.jpg"
+    },
     "camouflage_grouper": {
         "credit": "Steve Childs",
         "license": "CC BY 2.0",
@@ -22,12 +118,20 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c8/Cromileptes_altivelis.jpg/960px-Cromileptes_altivelis.jpg"
     },
     "catla": {
-        "credit": "Ranjithkumar Murugesan",
-        "license": "CC0",
-        "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-        "source_page": "https://commons.wikimedia.org/wiki/File:CATLA_FISH.jpg",
-        "title": "File:CATLA FISH.jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b5/CATLA_FISH.jpg/960px-CATLA_FISH.jpg"
+        "credit": "Jeevitha VM",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Catla_fish.jpg",
+        "title": "File:Catla fish.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/Catla_fish.jpg/960px-Catla_fish.jpg"
+    },
+    "chinese_pomfret": {
+        "credit": "Ooi Qie",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Pampus_chinensis_515710023.jpg",
+        "title": "File:Pampus chinensis 515710023.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5a/Pampus_chinensis_515710023.jpg/960px-Pampus_chinensis_515710023.jpg"
     },
     "chocolate_mahseer": {
         "credit": "Ben Laloo",
@@ -36,6 +140,46 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "source_page": "https://commons.wikimedia.org/wiki/File:Neolissochilus_hexagonolepis.jpg",
         "title": "File:Neolissochilus hexagonolepis.jpg",
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/70/Neolissochilus_hexagonolepis.jpg/960px-Neolissochilus_hexagonolepis.jpg"
+    },
+    "common_carp": {
+        "credit": "George Chernilevsky",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Cyprinus_carpio_2021_G1.jpg",
+        "title": "File:Cyprinus carpio 2021 G1.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Cyprinus_carpio_2021_G1.jpg/960px-Cyprinus_carpio_2021_G1.jpg"
+    },
+    "common_dolphin": {
+        "credit": "H. Zell",
+        "license": "CC BY-SA 3.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Delphinus_delphis_01.jpg",
+        "title": "File:Delphinus delphis 01.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b3/Delphinus_delphis_01.jpg/960px-Delphinus_delphis_01.jpg"
+    },
+    "common_krait": {
+        "credit": "Buddhika.jm",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Bungarus_caeruleus_3.jpg",
+        "title": "File:Bungarus caeruleus 3.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f0/Bungarus_caeruleus_3.jpg/960px-Bungarus_caeruleus_3.jpg"
+    },
+    "common_octopus_new": {
+        "credit": "H. Zell",
+        "license": "CC BY-SA 3.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Octopus_vulgaris_03.jpg",
+        "title": "File:Octopus vulgaris 03.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Octopus_vulgaris_03.jpg/960px-Octopus_vulgaris_03.jpg"
+    },
+    "convict_surgeonfish": {
+        "credit": "Wikimedia Commons contributor",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Acanthurus_triostegus.jpg",
+        "title": "File:Acanthurus triostegus.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0d/Acanthurus_triostegus.jpg/960px-Acanthurus_triostegus.jpg"
     },
     "crown_of_thorns": {
         "credit": "The Cosmonaut",
@@ -46,28 +190,52 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/Acanthaster_planci_-_Sirinat.jpg/960px-Acanthaster_planci_-_Sirinat.jpg"
     },
     "deccan_mahseer": {
-        "credit": "A. J. T. Johnsingh, WWF-India and NCF",
-        "license": "CC BY-SA 4.0",
-        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Blue-finned_(Tor_khudree),_an_exotic,_in_Harangi_hatchery_AJTJ_P1120062.jpg",
-        "title": "File:Blue-finned (Tor khudree), an exotic, in Harangi hatchery AJTJ P1120062.jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/83/Blue-finned_%28Tor_khudree%29%2C_an_exotic%2C_in_Harangi_hatchery_AJTJ_P1120062.jpg/960px-Blue-finned_%28Tor_khudree%29%2C_an_exotic%2C_in_Harangi_hatchery_AJTJ_P1120062.jpg"
+        "credit": "Nilesh Heda",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Tor_khudree_(Sykes).jpg",
+        "title": "File:Tor khudree (Sykes).jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/8/8b/Tor_khudree_%28Sykes%29.jpg"
     },
     "dugong": {
-        "credit": "Jerome Paillet (IFREMER, Laboratoire d'Océanographie Physique et Spatiale, Centre Bretagne - ZI de la Pointe du Diable -",
-        "license": "CC BY 4.0",
-        "license_url": "https://creativecommons.org/licenses/by/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Dugong_(Dugong_dugon)_(Ifremer_00617-72913).jpg",
-        "title": "File:Dugong (Dugong dugon) (Ifremer 00617-72913).jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Dugong_%28Dugong_dugon%29_%28Ifremer_00617-72913%29.jpg/960px-Dugong_%28Dugong_dugon%29_%28Ifremer_00617-72913%29.jpg"
+        "credit": "Geoff Spiby / www.geoffspiby.co.za",
+        "license": "CC BY-SA 3.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Dugong_dugon_(cropped).jpg",
+        "title": "File:Dugong dugon (cropped).jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/5/50/Dugong_dugon_%28cropped%29.jpg"
+    },
+    "emperor_angelfish": {
+        "credit": "https://www.flickr.com/photos/nostri-imago/",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Emperor_Angelfish_(Pomacanthus_imperator).jpg",
+        "title": "File:Emperor Angelfish (Pomacanthus imperator).jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/Emperor_Angelfish_%28Pomacanthus_imperator%29.jpg/960px-Emperor_Angelfish_%28Pomacanthus_imperator%29.jpg"
+    },
+    "fin_whale": {
+        "credit": "Emőke Dénes",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Em_-_Balaenoptera_physalus_-_4.jpg",
+        "title": "File:Em - Balaenoptera physalus - 4.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/Em_-_Balaenoptera_physalus_-_4.jpg/960px-Em_-_Balaenoptera_physalus_-_4.jpg"
+    },
+    "flatback_sea_turtle": {
+        "credit": "Alan Riverstone McCulloch (1885-1925)",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Natator_depressus.jpg",
+        "title": "File:Natator depressus.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/66/Natator_depressus.jpg/960px-Natator_depressus.jpg"
     },
     "ganges_river_dolphin": {
-        "credit": "Navdeepsood",
-        "license": "CC BY 4.0",
-        "license_url": "https://creativecommons.org/licenses/by/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Indus_River_Dolphin_(Platanista_gangetica_minor).jpg",
-        "title": "File:Indus River Dolphin (Platanista gangetica minor).jpg",
-        "url": "https://upload.wikimedia.org/wikipedia/commons/f/f8/Indus_River_Dolphin_%28Platanista_gangetica_minor%29.jpg"
+        "credit": "Unknown authorUnknown author",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Platanista_gangetica.jpg",
+        "title": "File:Platanista gangetica.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3d/Platanista_gangetica.jpg/960px-Platanista_gangetica.jpg"
     },
     "ganges_shark": {
         "credit": "FAO",
@@ -78,20 +246,68 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "url": "https://upload.wikimedia.org/wikipedia/commons/6/60/Glyphis_gangeticus.jpg"
     },
     "gharial": {
-        "credit": "Vojtěch Hála, edited by kaʁstn Disk/Cat (color balance, denoising of a few areas)",
+        "credit": "LenaWild",
         "license": "CC BY-SA 3.0",
         "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Gavialis_gangeticus_in_Prague.jpg",
-        "title": "File:Gavialis gangeticus in Prague.jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/50/Gavialis_gangeticus_in_Prague.jpg/960px-Gavialis_gangeticus_in_Prague.jpg"
+        "source_page": "https://commons.wikimedia.org/wiki/File:Gavialis_gangeticus_I.jpg",
+        "title": "File:Gavialis gangeticus I.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Gavialis_gangeticus_I.jpg/960px-Gavialis_gangeticus_I.jpg"
+    },
+    "giant_oceanic_manta_ray": {
+        "credit": "Dan Bender",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Mobula_birostris_179661369.jpg",
+        "title": "File:Mobula birostris 179661369.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/39/Mobula_birostris_179661369.jpg/960px-Mobula_birostris_179661369.jpg"
+    },
+    "giant_tiger_prawn": {
+        "credit": "self",
+        "license": "CC BY-SA 3.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Penaeus_monodon.jpg",
+        "title": "File:Penaeus monodon.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Penaeus_monodon.jpg/960px-Penaeus_monodon.jpg"
     },
     "golden_mahseer": {
-        "credit": "Charles J. Sharp",
+        "credit": "Reginald Beavan (1843-1927)",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Tor_putitora.jpg",
+        "title": "File:Tor putitora.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/8/8f/Tor_putitora.jpg"
+    },
+    "goldstripe_sardine": {
+        "credit": "BEDO (Thailand)",
         "license": "CC BY-SA 4.0",
         "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Golden_mahseer_(Tor_putitora)_Babai_River.jpg",
-        "title": "File:Golden mahseer (Tor putitora) Babai River.jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/Golden_mahseer_%28Tor_putitora%29_Babai_River.jpg/960px-Golden_mahseer_%28Tor_putitora%29_Babai_River.jpg"
+        "source_page": "https://commons.wikimedia.org/wiki/File:Sardinella_gibbosa.jpg",
+        "title": "File:Sardinella gibbosa.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/9/99/Sardinella_gibbosa.jpg"
+    },
+    "grass_carp": {
+        "credit": "Harka, Akos",
+        "license": "CC BY 3.0",
+        "license_url": "https://creativecommons.org/licenses/by/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Ctenopharyngodon_idella_2.jpg",
+        "title": "File:Ctenopharyngodon idella 2.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/5/51/Ctenopharyngodon_idella_2.jpg"
+    },
+    "greasy_grouper": {
+        "credit": "Totti",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Epinephelus_tauvina_Ogasawara.jpg",
+        "title": "File:Epinephelus tauvina Ogasawara.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/34/Epinephelus_tauvina_Ogasawara.jpg/960px-Epinephelus_tauvina_Ogasawara.jpg"
+    },
+    "great_hammerhead": {
+        "credit": "Dave M from Atlanta",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Sphyrna_mokarran_head.jpg",
+        "title": "File:Sphyrna mokarran head.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/Sphyrna_mokarran_head.jpg/960px-Sphyrna_mokarran_head.jpg"
     },
     "green_sea_turtle": {
         "credit": "Brocken Inaglory",
@@ -102,12 +318,12 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/Chelonia_mydas_is_going_for_the_air_edit.jpg/960px-Chelonia_mydas_is_going_for_the_air_edit.jpg"
     },
     "hawksbill_turtle": {
-        "credit": "Diego Delso",
-        "license": "CC BY-SA 4.0",
-        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Tortuga_carey_(Eretmochelys_imbricata),_Anilao,_Filipinas,_2023-08-22,_DD_15.jpg",
-        "title": "File:Tortuga carey (Eretmochelys imbricata), Anilao, Filipinas, 2023-08-22, DD 15.jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/Tortuga_carey_%28Eretmochelys_imbricata%29%2C_Anilao%2C_Filipinas%2C_2023-08-22%2C_DD_15.jpg/960px-Tortuga_carey_%28Eretmochelys_imbricata%29%2C_Anilao%2C_Filipinas%2C_2023-08-22%2C_DD_15.jpg"
+        "credit": "Bernard DUPONT from FRANCE",
+        "license": "CC BY-SA 2.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/2.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Hawksbill_Sea_Turtle_(Eretmochelys_imbricata)_(8478788258).jpg",
+        "title": "File:Hawksbill Sea Turtle (Eretmochelys imbricata) (8478788258).jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cb/Hawksbill_Sea_Turtle_%28Eretmochelys_imbricata%29_%288478788258%29.jpg/960px-Hawksbill_Sea_Turtle_%28Eretmochelys_imbricata%29_%288478788258%29.jpg"
     },
     "hilsa": {
         "credit": "Sannidhishetty",
@@ -117,13 +333,29 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "title": "File:Hilsa (Tenualosa ilisha).jpg",
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/Hilsa_%28Tenualosa_ilisha%29.jpg/960px-Hilsa_%28Tenualosa_ilisha%29.jpg"
     },
+    "horned_seastar": {
+        "credit": "Karelj",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Protoreaster_nodosus_1.jpg",
+        "title": "File:Protoreaster nodosus 1.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/Protoreaster_nodosus_1.jpg/960px-Protoreaster_nodosus_1.jpg"
+    },
+    "humpback_whale_new": {
+        "credit": "Charles J. Sharp",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Humpback_whale_(Megaptera_novaeangliae)_calf_Moorea_2.jpg",
+        "title": "File:Humpback whale (Megaptera novaeangliae) calf Moorea 2.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/03/Humpback_whale_%28Megaptera_novaeangliae%29_calf_Moorea_2.jpg/960px-Humpback_whale_%28Megaptera_novaeangliae%29_calf_Moorea_2.jpg"
+    },
     "humphead_parrotfish": {
-        "credit": "Paul Kli",
-        "license": "CC BY-SA 2.0",
-        "license_url": "https://creativecommons.org/licenses/by-sa/2.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Bolbometopon_muricatum_(26121525274).jpg",
-        "title": "File:Bolbometopon muricatum (26121525274).jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/41/Bolbometopon_muricatum_%2826121525274%29.jpg/960px-Bolbometopon_muricatum_%2826121525274%29.jpg"
+        "credit": "Nils",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Bolbometopon_muricatum_3016832.jpg",
+        "title": "File:Bolbometopon muricatum 3016832.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/Bolbometopon_muricatum_3016832.jpg/960px-Bolbometopon_muricatum_3016832.jpg"
     },
     "humphead_wrasse": {
         "credit": "Pauline Walsh Jacobson",
@@ -132,6 +364,30 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "source_page": "https://commons.wikimedia.org/wiki/File:Cheilinus_undulatus_178805119.jpg",
         "title": "File:Cheilinus undulatus 178805119.jpg",
         "url": "https://upload.wikimedia.org/wikipedia/commons/0/0a/Cheilinus_undulatus_178805119.jpg"
+    },
+    "indian_anchovy": {
+        "credit": "BEDO (Thailand)",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Stolephorus_indicus.jpg",
+        "title": "File:Stolephorus indicus.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/7/71/Stolephorus_indicus.jpg"
+    },
+    "indian_chameleon": {
+        "credit": "M.arunprasad",
+        "license": "CC BY 2.5",
+        "license_url": "https://creativecommons.org/licenses/by/2.5",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Chamaeleo_zeylanicus.jpg",
+        "title": "File:Chamaeleo zeylanicus.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1f/Chamaeleo_zeylanicus.jpg/960px-Chamaeleo_zeylanicus.jpg"
+    },
+    "indian_cobra": {
+        "credit": "Sandeep Nanu",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Naja_naja_139716904.jpg",
+        "title": "File:Naja naja 139716904.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7c/Naja_naja_139716904.jpg/960px-Naja_naja_139716904.jpg"
     },
     "indian_featherback": {
         "credit": "Henry Sullivan Thomas",
@@ -142,20 +398,20 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/51/Chitala_chitala_Thomas.jpg/960px-Chitala_chitala_Thomas.jpg"
     },
     "indian_flapshell_turtle": {
-        "credit": "Adityamadhav83",
-        "license": "CC BY-SA 3.0",
-        "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:(Lissemys_punctata)_Indian_flap_shell_Turtle_03.JPG",
-        "title": "File:(Lissemys punctata) Indian flap shell Turtle 03.JPG",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fd/%28Lissemys_punctata%29_Indian_flap_shell_Turtle_03.JPG/960px-%28Lissemys_punctata%29_Indian_flap_shell_Turtle_03.JPG"
+        "credit": "Rejoice Gassah",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Lissemys_punctata_88503116.jpg",
+        "title": "File:Lissemys punctata 88503116.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/Lissemys_punctata_88503116.jpg/960px-Lissemys_punctata_88503116.jpg"
     },
     "indian_mackerel": {
-        "credit": "Kora27",
-        "license": "CC BY-SA 4.0",
-        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Gro%C3%9Fmaul-Makrele_(Rastrelliger_kanagurta)_im_Roten_Meer_DSCF5424WI.jpg",
-        "title": "File:Großmaul-Makrele (Rastrelliger kanagurta) im Roten Meer DSCF5424WI.jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b6/Gro%C3%9Fmaul-Makrele_%28Rastrelliger_kanagurta%29_im_Roten_Meer_DSCF5424WI.jpg/960px-Gro%C3%9Fmaul-Makrele_%28Rastrelliger_kanagurta%29_im_Roten_Meer_DSCF5424WI.jpg"
+        "credit": "Kudus Kadharsha, Ponnuvel Mohanchander",
+        "license": "CC BY 3.0",
+        "license_url": "https://creativecommons.org/licenses/by/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Rastrelliger_kanagurta_India.jpg",
+        "title": "File:Rastrelliger kanagurta India.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/7/78/Rastrelliger_kanagurta_India.jpg"
     },
     "indian_narrow_headed_softshell": {
         "credit": "Andrey Butko",
@@ -174,12 +430,12 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "url": "https://upload.wikimedia.org/wikipedia/commons/1/19/Sousa_plumbea.jpg"
     },
     "indian_oil_sardine": {
-        "credit": "Sannidhishetty",
+        "credit": "Hariprasad Shetty10",
         "license": "CC0",
         "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Indian_oil_sardine_(Sardinella_longiceps).jpg",
-        "title": "File:Indian oil sardine (Sardinella longiceps).jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ec/Indian_oil_sardine_%28Sardinella_longiceps%29.jpg/960px-Indian_oil_sardine_%28Sardinella_longiceps%29.jpg"
+        "source_page": "https://commons.wikimedia.org/wiki/File:Sardinella_longiceps.jpg",
+        "title": "File:Sardinella longiceps.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Sardinella_longiceps.jpg/960px-Sardinella_longiceps.jpg"
     },
     "indian_peacock_softshell": {
         "credit": "Tiia Monto",
@@ -189,37 +445,109 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "title": "File:Nilssonia hurum.jpg",
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/Nilssonia_hurum.jpg/960px-Nilssonia_hurum.jpg"
     },
+    "indian_python": {
+        "credit": "Tigerpython",
+        "license": "CC BY 3.0",
+        "license_url": "https://creativecommons.org/licenses/by/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Python_molurus_molurus-Portrait.jpg",
+        "title": "File:Python molurus molurus-Portrait.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b1/Python_molurus_molurus-Portrait.jpg/960px-Python_molurus_molurus-Portrait.jpg"
+    },
     "indian_softshell_turtle": {
-        "credit": "Nandita Madhu",
+        "credit": "Cuvier",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Nilssonia_gangetica.jpg",
+        "title": "File:Nilssonia gangetica.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/9/97/Nilssonia_gangetica.jpg"
+    },
+    "indian_squid": {
+        "credit": "JIBON",
         "license": "CC BY-SA 4.0",
         "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Indian_Softshell_turtle_(Nilssonia_gangetica).jpg",
-        "title": "File:Indian Softshell turtle (Nilssonia gangetica).jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/35/Indian_Softshell_turtle_%28Nilssonia_gangetica%29.jpg/960px-Indian_Softshell_turtle_%28Nilssonia_gangetica%29.jpg"
+        "source_page": "https://commons.wikimedia.org/wiki/File:Uroteuthis_duvaucelii_-_Indian_squid_(%E0%A6%A8%E0%A7%81%E0%A6%87%E0%A6%B2%E0%A7%8D%E0%A6%B2%E0%A6%BE)_01.jpg",
+        "title": "File:Uroteuthis duvaucelii - Indian squid (নুইল্লা) 01.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/Uroteuthis_duvaucelii_-_Indian_squid_%28%E0%A6%A8%E0%A7%81%E0%A6%87%E0%A6%B2%E0%A7%8D%E0%A6%B2%E0%A6%BE%29_01.jpg/960px-Uroteuthis_duvaucelii_-_Indian_squid_%28%E0%A6%A8%E0%A7%81%E0%A6%87%E0%A6%B2%E0%A7%8D%E0%A6%B2%E0%A6%BE%29_01.jpg"
     },
     "irrawaddy_dolphin": {
-        "credit": "Bernard DUPONT from FRANCE",
-        "license": "CC BY-SA 2.0",
-        "license_url": "https://creativecommons.org/licenses/by-sa/2.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Irrawaddy_Dolphin_(Orcaella_brevirostris)_(15657932290).jpg",
-        "title": "File:Irrawaddy Dolphin (Orcaella brevirostris) (15657932290).jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ce/Irrawaddy_Dolphin_%28Orcaella_brevirostris%29_%2815657932290%29.jpg/960px-Irrawaddy_Dolphin_%28Orcaella_brevirostris%29_%2815657932290%29.jpg"
+        "credit": "Long Vu",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Orcaella_brevirostris_-_Long_Vu_-_99590612.jpeg",
+        "title": "File:Orcaella brevirostris - Long Vu - 99590612.jpeg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6f/Orcaella_brevirostris_-_Long_Vu_-_99590612.jpeg/960px-Orcaella_brevirostris_-_Long_Vu_-_99590612.jpeg"
+    },
+    "johns_snapper": {
+        "credit": "JIBON",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Lutjanus_johnii_-_John%27s_snapper_(%E0%A6%B0%E0%A6%BE%E0%A6%99%E0%A7%8D%E0%A6%97%E0%A6%BE_%E0%A6%9A%E0%A7%8C%E0%A6%95%E0%A7%8D%E0%A6%B7%E0%A6%BE_%E0%A6%AE%E0%A6%BE%E0%A6%9B)_01.jpg",
+        "title": "File:Lutjanus johnii - John's snapper (রাঙ্গা চৌক্ষা মাছ) 01.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/52/Lutjanus_johnii_-_John%27s_snapper_%28%E0%A6%B0%E0%A6%BE%E0%A6%99%E0%A7%8D%E0%A6%97%E0%A6%BE_%E0%A6%9A%E0%A7%8C%E0%A6%95%E0%A7%8D%E0%A6%B7%E0%A6%BE_%E0%A6%AE%E0%A6%BE%E0%A6%9B%29_01.jpg/960px-Lutjanus_johnii_-_John%27s_snapper_%28%E0%A6%B0%E0%A6%BE%E0%A6%99%E0%A7%8D%E0%A6%97%E0%A6%BE_%E0%A6%9A%E0%A7%8C%E0%A6%95%E0%A7%8D%E0%A6%B7%E0%A6%BE_%E0%A6%AE%E0%A6%BE%E0%A6%9B%29_01.jpg"
+    },
+    "kemps_ridley_sea_turtle": {
+        "credit": "U.S. Fish and Wildlife Service Southeast Region",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Lepidochelys_kempii.jpg",
+        "title": "File:Lepidochelys kempii.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5b/Lepidochelys_kempii.jpg/960px-Lepidochelys_kempii.jpg"
+    },
+    "king_cobra": {
+        "credit": "en:User:Dawson",
+        "license": "CC BY-SA 2.5",
+        "license_url": "https://creativecommons.org/licenses/by-sa/2.5",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Ophiophagus_hannah_(2).jpg",
+        "title": "File:Ophiophagus hannah (2).jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/d/da/Ophiophagus_hannah_%282%29.jpg"
     },
     "leatherback_turtle": {
-        "credit": "Photo by David J. Stang",
+        "credit": "Emőke Dénes",
         "license": "CC BY-SA 4.0",
         "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Dermochelys_coriacea_5zz.jpg",
-        "title": "File:Dermochelys coriacea 5zz.jpg",
-        "url": "https://upload.wikimedia.org/wikipedia/commons/f/f2/Dermochelys_coriacea_5zz.jpg"
+        "source_page": "https://commons.wikimedia.org/wiki/File:Hul_-_Dermochelys_coriacea_-_2.jpg",
+        "title": "File:Hul - Dermochelys coriacea - 2.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3f/Hul_-_Dermochelys_coriacea_-_2.jpg/960px-Hul_-_Dermochelys_coriacea_-_2.jpg"
+    },
+    "loggerhead_sea_turtle": {
+        "credit": "Ronavni",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Caretta_caretta_Philipino.jpg",
+        "title": "File:Caretta caretta Philipino.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b5/Caretta_caretta_Philipino.jpg/960px-Caretta_caretta_Philipino.jpg"
+    },
+    "mackerel_scad": {
+        "credit": "Julien Bidet for Seamarc",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Decapterus_macarellus_Maldives.JPG",
+        "title": "File:Decapterus macarellus Maldives.JPG",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c3/Decapterus_macarellus_Maldives.JPG/960px-Decapterus_macarellus_Maldives.JPG"
+    },
+    "magnificent_sea_anemone": {
+        "credit": "Rickard Zerpe",
+        "license": "CC BY 2.0",
+        "license_url": "https://creativecommons.org/licenses/by/2.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Magnificent_sea_anemone_(Heteractis_magnifica)_(48737203553)_(cropped).jpg",
+        "title": "File:Magnificent sea anemone (Heteractis magnifica) (48737203553) (cropped).jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/62/Magnificent_sea_anemone_%28Heteractis_magnifica%29_%2848737203553%29_%28cropped%29.jpg/960px-Magnificent_sea_anemone_%28Heteractis_magnifica%29_%2848737203553%29_%28cropped%29.jpg"
     },
     "milkfish": {
-        "credit": "Hectonichus",
+        "credit": "Elisabeth Morcel",
         "license": "CC BY-SA 4.0",
         "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Chanidae_-_Chanos_chanos.JPG",
-        "title": "File:Chanidae - Chanos chanos.JPG",
-        "url": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Chanidae_-_Chanos_chanos.JPG"
+        "source_page": "https://commons.wikimedia.org/wiki/File:Chanos_chanos.jpg",
+        "title": "File:Chanos chanos.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c3/Chanos_chanos.jpg/960px-Chanos_chanos.jpg"
+    },
+    "moon_jellyfish": {
+        "credit": "Hans Hillewaert",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Aurelia_aurita_2.jpg",
+        "title": "File:Aurelia aurita 2.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Aurelia_aurita_2.jpg/960px-Aurelia_aurita_2.jpg"
     },
     "mrigal": {
         "credit": "Priyankar Chakraborty",
@@ -238,12 +566,36 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Scylla_serrata.jpg/960px-Scylla_serrata.jpg"
     },
     "mugger_crocodile": {
-        "credit": "Hari Mohan Meena",
+        "credit": "Charles J. Sharp",
         "license": "CC BY-SA 4.0",
         "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Close_encounter_with_mugger_crocodile_(Crocodylus_palustris),_NCS,_India.jpg",
-        "title": "File:Close encounter with mugger crocodile (Crocodylus palustris), NCS, India.jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a5/Close_encounter_with_mugger_crocodile_%28Crocodylus_palustris%29%2C_NCS%2C_India.jpg/960px-Close_encounter_with_mugger_crocodile_%28Crocodylus_palustris%29%2C_NCS%2C_India.jpg"
+        "source_page": "https://commons.wikimedia.org/wiki/File:Mugger_crocodile_(Crocodylus_palustris).jpg",
+        "title": "File:Mugger crocodile (Crocodylus palustris).jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f0/Mugger_crocodile_%28Crocodylus_palustris%29.jpg/960px-Mugger_crocodile_%28Crocodylus_palustris%29.jpg"
+    },
+    "narrowbarred_spanish_mackerel": {
+        "credit": "Hamid Badar Osmany",
+        "license": "CC BY 3.0",
+        "license_url": "https://creativecommons.org/licenses/by/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Scomberomorus_commerson_Pakistan.jpg",
+        "title": "File:Scomberomorus commerson Pakistan.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/e/e0/Scomberomorus_commerson_Pakistan.jpg"
+    },
+    "nile_tilapia": {
+        "credit": "Magdy A. Saleh",
+        "license": "CC BY 3.0",
+        "license_url": "https://creativecommons.org/licenses/by/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Oreochromis_niloticus_Egypt.jpg",
+        "title": "File:Oreochromis niloticus Egypt.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/0/0f/Oreochromis_niloticus_Egypt.jpg"
+    },
+    "ocellaris_clownfish": {
+        "credit": "Nhobgood Nick Hobgood",
+        "license": "CC BY-SA 3.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Amphiprion_ocellaris_(_Clownfish).jpg",
+        "title": "File:Amphiprion ocellaris ( Clownfish).jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5e/Amphiprion_ocellaris_%28_Clownfish%29.jpg/960px-Amphiprion_ocellaris_%28_Clownfish%29.jpg"
     },
     "olive_ridley_turtle": {
         "credit": "Bernard Gagnon",
@@ -253,13 +605,53 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "title": "File:Lepidochelys olivacea.jpg",
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/Lepidochelys_olivacea.jpg/960px-Lepidochelys_olivacea.jpg"
     },
-    "red_crowned_roofed_turtle": {
-        "credit": "Hari arcw",
+    "orca_new": {
+        "credit": "Yathin S Krishnappa",
+        "license": "CC BY-SA 3.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Orcinus_orca_(Vestfjord).jpg",
+        "title": "File:Orcinus orca (Vestfjord).jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/Orcinus_orca_%28Vestfjord%29.jpg/960px-Orcinus_orca_%28Vestfjord%29.jpg"
+    },
+    "painted_spiny_lobster": {
+        "credit": "Jean-Paul Boerekamps",
+        "license": "CC0",
+        "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Panulirus_versicolor_336178252.jpg",
+        "title": "File:Panulirus versicolor 336178252.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ad/Panulirus_versicolor_336178252.jpg/960px-Panulirus_versicolor_336178252.jpg"
+    },
+    "pencil_urchin": {
+        "credit": "Julien Bidet for MDC Seamarc",
         "license": "CC BY-SA 4.0",
         "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Batagur_kachuga_Adult_male_in_National_Chambal_Sanctuary.jpg",
-        "title": "File:Batagur kachuga Adult male in National Chambal Sanctuary.jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Batagur_kachuga_Adult_male_in_National_Chambal_Sanctuary.jpg/960px-Batagur_kachuga_Adult_male_in_National_Chambal_Sanctuary.jpg"
+        "source_page": "https://commons.wikimedia.org/wiki/File:Echinometra_mathaei_Maldives.JPG",
+        "title": "File:Echinometra mathaei Maldives.JPG",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/Echinometra_mathaei_Maldives.JPG/960px-Echinometra_mathaei_Maldives.JPG"
+    },
+    "pickhandle_barracuda": {
+        "credit": "Vincent Kruger",
+        "license": "CC0",
+        "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Barracuda_Sphyraena_jello.jpg",
+        "title": "File:Barracuda Sphyraena jello.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/e/e3/Barracuda_Sphyraena_jello.jpg"
+    },
+    "red_crowned_roofed_turtle": {
+        "credit": "Hari Mohan Meena",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Hatchlings_of_Batagur_dhongoka_and_Batagur_kachuga.jpg",
+        "title": "File:Hatchlings of Batagur dhongoka and Batagur kachuga.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f6/Hatchlings_of_Batagur_dhongoka_and_Batagur_kachuga.jpg/960px-Hatchlings_of_Batagur_dhongoka_and_Batagur_kachuga.jpg"
+    },
+    "redbelly_tilapia": {
+        "credit": "Boulenger, George Albert, 1858-1937",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Coptodon_zillii.jpg",
+        "title": "File:Coptodon zillii.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/2/23/Coptodon_zillii.jpg"
     },
     "reef_manta_ray": {
         "credit": "Gant223",
@@ -269,6 +661,14 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "title": "File:Mobula alfredi in Aqua park.png",
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/Mobula_alfredi_in_Aqua_park.png/960px-Mobula_alfredi_in_Aqua_park.png"
     },
+    "reticulated_python": {
+        "credit": "Tylwyth Eldar",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Alligator_Bay_-_Malayopython_reticulatus_01.jpg",
+        "title": "File:Alligator Bay - Malayopython reticulatus 01.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/77/Alligator_Bay_-_Malayopython_reticulatus_01.jpg/960px-Alligator_Bay_-_Malayopython_reticulatus_01.jpg"
+    },
     "rohu": {
         "credit": "Khalid Mahmood",
         "license": "CC BY-SA 4.0",
@@ -277,29 +677,85 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "title": "File:Labeo rohita.JPG",
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d1/Labeo_rohita.JPG/960px-Labeo_rohita.JPG"
     },
+    "saltwater_crocodile": {
+        "credit": "H. Zell",
+        "license": "CC BY-SA 3.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Crocodylus_porosus_-_Wilhelma.jpg",
+        "title": "File:Crocodylus porosus - Wilhelma.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/Crocodylus_porosus_-_Wilhelma.jpg/960px-Crocodylus_porosus_-_Wilhelma.jpg"
+    },
     "sandfish_sea_cucumber": {
-        "credit": "Ria Tan from singapore",
-        "license": "CC BY-SA 2.0",
-        "license_url": "https://creativecommons.org/licenses/by-sa/2.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Garlic_bread_sea_cucumber_(Holothuria_scabra).jpg",
-        "title": "File:Garlic bread sea cucumber (Holothuria scabra).jpg",
-        "url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Garlic_bread_sea_cucumber_%28Holothuria_scabra%29.jpg"
-    },
-    "scalloped_hammerhead": {
-        "credit": "Kris Mikael Krister",
-        "license": "CC BY 3.0",
-        "license_url": "https://creativecommons.org/licenses/by/3.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Scalloped_Hammerhead_Shark_Sphyrna_Lewini_(226845659).jpeg",
-        "title": "File:Scalloped Hammerhead Shark Sphyrna Lewini (226845659).jpeg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bf/Scalloped_Hammerhead_Shark_Sphyrna_Lewini_%28226845659%29.jpeg/960px-Scalloped_Hammerhead_Shark_Sphyrna_Lewini_%28226845659%29.jpeg"
-    },
-    "spotted_seahorse": {
-        "credit": "Emőke Dénes",
+        "credit": "Gihan Jayaweera",
         "license": "CC BY-SA 4.0",
         "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Hal_-_Hippocampus_kuda_-_3.jpg",
-        "title": "File:Hal - Hippocampus kuda - 3.jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4c/Hal_-_Hippocampus_kuda_-_3.jpg/960px-Hal_-_Hippocampus_kuda_-_3.jpg"
+        "source_page": "https://commons.wikimedia.org/wiki/File:Holothuria_scabra.jpg",
+        "title": "File:Holothuria scabra.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/4/4a/Holothuria_scabra.jpg"
+    },
+    "scalloped_hammerhead": {
+        "credit": "Wikimedia Commons contributor",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Sphyrna_lewini.jpg",
+        "title": "File:Sphyrna lewini.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/9/9b/Sphyrna_lewini.jpg"
+    },
+    "sergeant_major": {
+        "credit": "Lucas Rodrigues",
+        "license": "CC0",
+        "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Abudefduf_saxatilis_-_Lucas_Rodrigues_-_581316227.jpeg",
+        "title": "File:Abudefduf saxatilis - Lucas Rodrigues - 581316227.jpeg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Abudefduf_saxatilis_-_Lucas_Rodrigues_-_581316227.jpeg/960px-Abudefduf_saxatilis_-_Lucas_Rodrigues_-_581316227.jpeg"
+    },
+    "silver_carp": {
+        "credit": "Wikimedia Commons contributor",
+        "license": "CC BY-SA 3.0",
+        "license_url": "http://creativecommons.org/licenses/by-sa/3.0/",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Hypophthalmichthys_molitrix.jpg",
+        "title": "File:Hypophthalmichthys molitrix.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e5/Hypophthalmichthys_molitrix.jpg/960px-Hypophthalmichthys_molitrix.jpg"
+    },
+    "skipjack_tuna": {
+        "credit": "H. L. Todd",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Katsuwonus_pelamis.jpg",
+        "title": "File:Katsuwonus pelamis.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/15/Katsuwonus_pelamis.jpg/960px-Katsuwonus_pelamis.jpg"
+    },
+    "sperm_whale_new": {
+        "credit": "Bernard Spragg. NZ from Christchurch, New Zealand",
+        "license": "CC0",
+        "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Sperm_whale..(Physeter_macrocephalus)_(8066509296).jpg",
+        "title": "File:Sperm whale..(Physeter macrocephalus) (8066509296).jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2a/Sperm_whale..%28Physeter_macrocephalus%29_%288066509296%29.jpg/960px-Sperm_whale..%28Physeter_macrocephalus%29_%288066509296%29.jpg"
+    },
+    "spinner_dolphin": {
+        "credit": "B.navez",
+        "license": "CC BY-SA 3.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Stenella_longirostris_R%C3%A9union.JPG",
+        "title": "File:Stenella longirostris Réunion.JPG",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Stenella_longirostris_R%C3%A9union.JPG/960px-Stenella_longirostris_R%C3%A9union.JPG"
+    },
+    "spotted_eagle_ray": {
+        "credit": "D Ross Robertson",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Aetobatus_narinari_SI2.jpg",
+        "title": "File:Aetobatus narinari SI2.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/9/9d/Aetobatus_narinari_SI2.jpg"
+    },
+    "spotted_seahorse": {
+        "credit": "Marco Almbauer",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Hippocampus_kuda.jpg",
+        "title": "File:Hippocampus kuda.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Hippocampus_kuda.jpg/960px-Hippocampus_kuda.jpg"
     },
     "striped_snakehead": {
         "credit": "Motu purkait",
@@ -309,12 +765,52 @@ SPECIES_IMAGES: dict[str, dict[str, str]] = {
         "title": "File:Channa striata (36048).jpg",
         "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e0/Channa_striata_%2836048%29.jpg/960px-Channa_striata_%2836048%29.jpg"
     },
+    "tiger_shark": {
+        "credit": "D Ross Robertson",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Galeocerdo_cuvier_jaws.jpg",
+        "title": "File:Galeocerdo cuvier jaws.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/4/41/Galeocerdo_cuvier_jaws.jpg"
+    },
+    "vagabond_butterflyfish": {
+        "credit": "Dr. Dwayne Meadows, NOAA/NMFS/OPR",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Chaetodon_vagabundus.jpg",
+        "title": "File:Chaetodon vagabundus.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/73/Chaetodon_vagabundus.jpg/960px-Chaetodon_vagabundus.jpg"
+    },
+    "water_monitor": {
+        "credit": "Photo by David J. Stang",
+        "license": "CC BY-SA 4.0",
+        "license_url": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Varanus_salvator_1zz.jpg",
+        "title": "File:Varanus salvator 1zz.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c2/Varanus_salvator_1zz.jpg/960px-Varanus_salvator_1zz.jpg"
+    },
     "whale_shark": {
-        "credit": "Hyppolyte de Saint-Rambert",
+        "credit": "Rachel Crane",
         "license": "CC BY 4.0",
         "license_url": "https://creativecommons.org/licenses/by/4.0",
-        "source_page": "https://commons.wikimedia.org/wiki/File:Okinawa_Churaumi_aquarium_Rhincodon_typus_hdsr_Vlux5_02.jpg",
-        "title": "File:Okinawa Churaumi aquarium Rhincodon typus hdsr Vlux5 02.jpg",
-        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Okinawa_Churaumi_aquarium_Rhincodon_typus_hdsr_Vlux5_02.jpg/960px-Okinawa_Churaumi_aquarium_Rhincodon_typus_hdsr_Vlux5_02.jpg"
+        "source_page": "https://commons.wikimedia.org/wiki/File:Rhincodon_typus_328869965.jpg",
+        "title": "File:Rhincodon typus 328869965.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Rhincodon_typus_328869965.jpg/960px-Rhincodon_typus_328869965.jpg"
+    },
+    "whitetip_reef_shark": {
+        "credit": "Matt Berger",
+        "license": "CC BY 4.0",
+        "license_url": "https://creativecommons.org/licenses/by/4.0",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Triaenodon_obesus_458750867.jpg",
+        "title": "File:Triaenodon obesus 458750867.jpg",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/e/e2/Triaenodon_obesus_458750867.jpg"
+    },
+    "yellowfin_tuna": {
+        "credit": "Unknown authorUnknown author",
+        "license": "Public domain",
+        "license_url": "",
+        "source_page": "https://commons.wikimedia.org/wiki/File:Thunnus_albacares.jpg",
+        "title": "File:Thunnus albacares.jpg",
+        "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/05/Thunnus_albacares.jpg/960px-Thunnus_albacares.jpg"
     }
 }

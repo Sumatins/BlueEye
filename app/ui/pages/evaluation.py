@@ -200,8 +200,13 @@ def render(detector: MarineDetector, settings, user=None) -> None:
 # --------------------------------------------------------------------------- #
 # Overview
 # --------------------------------------------------------------------------- #
+@st.fragment(run_every=PROGRESS_REFRESH_SECONDS)
 def _overview(settings, store: EvaluationStore, user_id: str) -> None:
     stats = store.stats(user_id)
+    # Add worker health card
+    status = eval_scheduler.status()
+    health_label = status.get('summary', 'unknown')
+    health_kind = 'ok' if status.get('running') else 'warn'
     metrics_row(
         st,
         [
@@ -209,6 +214,7 @@ def _overview(settings, store: EvaluationStore, user_id: str) -> None:
             ("Experiments", stats["experiments"], "recorded for you"),
             ("In progress", stats["active"], "running / queued"),
             ("With results", stats["completed"] + stats["partial"], "completed"),
+            ("Worker health", health_label, ""),
         ],
     )
     last = stats.get("last_completed")
@@ -906,6 +912,7 @@ def _datasets_section(settings, store: EvaluationStore, user_id: str) -> None:
                     f"{len(record.class_names)} classes · splits: "
                     f"{', '.join(record.splits) or 'unknown'} · "
                     f"fingerprint {record.fingerprint[:12] or 'n/a'}"
+                    + (" · Synthetic" if getattr(record, "is_synthetic", False) else "")
                 )
                 if record.class_names:
                     st.caption("Classes: " + ", ".join(record.class_names))
@@ -1002,6 +1009,9 @@ def _register_from_path(store: EvaluationStore, user_id, path_text, name_text) -
         f"Registered '{record.name}' with {len(record.class_names)} classes "
         f"across splits: {', '.join(record.splits) or 'none'}."
     )
+    # Make dataset immediately selectable in the run form
+    st.session_state["eval_dataset"] = str(record.data_yaml)
+    st.rerun()
 
 
 def _revalidate(store: EvaluationStore, user_id: str, record) -> None:
@@ -1343,70 +1353,10 @@ def _reproducibility(record) -> None:
         hide_index=True,
         width="stretch",
     )
-    if record.parameters:
-        st.caption("Parameters")
-        st.json(record.parameters)
-    if record.model_fingerprints:
-        st.caption("Model weight fingerprints")
-        st.json(record.model_fingerprints)
-    st.code(_rerun_command(record), language="powershell")
     st.caption(
         "Weights and environment may change; BlueEye records them so a rerun "
         "can be judged, but does not claim perfect reproducibility."
     )
-
-
-def _rerun_command(record) -> str:
-    """A CLI command that reproduces this run from its *saved* configuration.
-
-    Built from the persisted experiment row (dataset, split, models and the
-    stored ``parameters``), never from the current form values, and only with
-    flags the CLI actually supports.
-    """
-    parameters = record.parameters or {}
-    model_flags = (
-        " ".join(f"--model {key}" for key in record.model_keys)
-        if record.model_keys
-        else "--model all"
-    )
-    parts = [
-        "python scripts/run_evaluation.py",
-        f'--data "{record.data_yaml}"',
-        f"--split {record.split or 'test'}",
-        model_flags,
-    ]
-
-    # The UI stores ``max_images``/``confidence``; the CLI stores ``limit``/
-    # ``confidence_override``. Reproduce whichever is present.
-    limit = parameters.get("max_images")
-    if limit is None:
-        limit = parameters.get("limit")
-    if isinstance(limit, int) and limit > 0:
-        parts.append(f"--limit {limit}")
-
-    iou = parameters.get("iou_threshold_for_figures")
-    if isinstance(iou, (int, float)):
-        parts.append(f"--iou {float(iou):g}")
-
-    confidence = parameters.get("confidence")
-    if confidence is None:
-        confidence = parameters.get("confidence_override")
-    if isinstance(confidence, (int, float)):
-        parts.append(f"--confidence {float(confidence):g}")
-
-    device = parameters.get("device")
-    if isinstance(device, str) and device and device != "auto":
-        parts.append(f"--device {device}")
-
-    if parameters.get("plots"):
-        parts.append("--plots")
-
-    name = str(getattr(record, "name", "") or "").replace('"', "'").strip()
-    if name:
-        parts.append(f'--name "{name}"')
-
-    parts.append(f"--record --owner {record.user_id}")
-    return " ".join(parts)
 
 
 # --------------------------------------------------------------------------- #

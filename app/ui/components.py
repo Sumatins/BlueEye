@@ -73,11 +73,11 @@ def metric_card(
 
 
 def metrics_row(container, items: Sequence[tuple[str, Any, str]], accent_first: bool = True) -> None:
-    """Render a row of up to four metric cards."""
+    """Render a row of metric cards."""
     if not items:
         return
-    columns = container.columns(min(len(items), 4))
-    for index, (label, value, hint) in enumerate(items[:4]):
+    columns = container.columns(len(items))
+    for index, (label, value, hint) in enumerate(items):
         metric_card(columns[index], label, value, hint, accent=accent_first and index == 0)
 
 

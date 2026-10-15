@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS evaluation_schedules (
     last_run_at               TEXT,
     last_experiment_id        TEXT,
     last_status               TEXT NOT NULL DEFAULT '',
+    last_error                TEXT NOT NULL DEFAULT '',
     run_count                 INTEGER NOT NULL DEFAULT 0,
     created_at                TEXT NOT NULL,
     updated_at                TEXT NOT NULL
@@ -181,6 +182,7 @@ class Schedule:
     last_run_at: str | None = None
     last_experiment_id: str | None = None
     last_status: str = ""
+    last_error: str = ""
     run_count: int = 0
     created_at: str = ""
     updated_at: str = ""
@@ -228,6 +230,7 @@ class Schedule:
             "last_run_at": self.last_run_at,
             "last_experiment_id": self.last_experiment_id,
             "last_status": self.last_status,
+            "last_error": self.last_error,
             "run_count": self.run_count,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -352,6 +355,12 @@ class ScheduleStore:
         with self._connect() as conn:
             conn.executescript(_SCHEMA)
             conn.executescript(_PREFERENCES_SCHEMA)
+            try:
+                conn.execute(
+                    "ALTER TABLE evaluation_schedules ADD COLUMN last_error TEXT NOT NULL DEFAULT ''"
+                )
+            except sqlite3.OperationalError:
+                pass
 
     # -- create / read --------------------------------------------------- #
     def create(
@@ -481,6 +490,7 @@ class ScheduleStore:
         dataset_fingerprint: str,
         model_fingerprints: dict,
         ran_at: str | None = None,
+        error: str = "",
     ) -> None:
         """Record that a run was started, with the fingerprints it used.
 
@@ -491,7 +501,7 @@ class ScheduleStore:
         with self._connect() as conn:
             conn.execute(
                 "UPDATE evaluation_schedules SET last_run_at = ?, "
-                "last_experiment_id = ?, last_status = ?, "
+                "last_experiment_id = ?, last_status = ?, last_error = ?, "
                 "last_dataset_fingerprint = ?, last_model_fingerprints = ?, "
                 "run_count = run_count + 1, updated_at = ? "
                 "WHERE id = ? AND user_id = ?",
@@ -499,6 +509,7 @@ class ScheduleStore:
                     ran_at or _utcnow(),
                     experiment_id,
                     status,
+                    error,
                     dataset_fingerprint,
                     _canonical(model_fingerprints),
                     _utcnow(),
@@ -507,12 +518,14 @@ class ScheduleStore:
                 ),
             )
 
-    def set_last_status(self, schedule_id: str, user_id: str, status: str) -> None:
+    def set_last_status(
+        self, schedule_id: str, user_id: str, status: str, error: str = ""
+    ) -> None:
         with self._connect() as conn:
             conn.execute(
-                "UPDATE evaluation_schedules SET last_status = ?, updated_at = ? "
+                "UPDATE evaluation_schedules SET last_status = ?, last_error = ?, updated_at = ? "
                 "WHERE id = ? AND user_id = ?",
-                (status, _utcnow(), schedule_id, user_id),
+                (status, error, _utcnow(), schedule_id, user_id),
             )
 
     # -- per-account continuous-evaluation preferences ------------------- #
@@ -604,6 +617,7 @@ def _row(row: sqlite3.Row) -> Schedule:
         last_run_at=row["last_run_at"],
         last_experiment_id=row["last_experiment_id"],
         last_status=row["last_status"],
+        last_error=str(row["last_error"] if "last_error" in row.keys() else ""),
         run_count=row["run_count"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],

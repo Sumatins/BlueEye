@@ -158,6 +158,17 @@ class DatasetValidation:
                 return report
         return None
 
+    @property
+    def is_synthetic(self) -> bool:
+        """True when the dataset name, path, or root indicates synthetic or test fixture data."""
+        name_l = self.name.lower()
+        path_l = str(self.data_yaml).lower()
+        root_l = str(self.root).lower()
+        return any(
+            token in name_l or token in path_l or token in root_l
+            for token in ("synthetic", "toy", "mock", "dummy")
+        )
+
     def as_dict(self) -> dict:
         return {
             "data_yaml": str(self.data_yaml),
@@ -170,6 +181,7 @@ class DatasetValidation:
             "warnings": [issue.as_dict() for issue in self.warnings],
             "fingerprint": self.fingerprint,
             "ready": self.ready,
+            "is_synthetic": self.is_synthetic,
         }
 
 
