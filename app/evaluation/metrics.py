@@ -44,7 +44,7 @@ class DetectionBox:
 
 @dataclass(frozen=True)
 class ClassMetrics:
-    """Precision / recall / AP for a single class."""
+    """Precision / recall / AP / F1 / counts for a single class."""
 
     class_id: int
     name: str
@@ -54,6 +54,10 @@ class ClassMetrics:
     ap50_95: float
     precision: float
     recall: float
+    f1: float = 0.0
+    tp: int = 0
+    fp: int = 0
+    fn: int = 0
 
 
 @dataclass(frozen=True)
@@ -65,12 +69,14 @@ class EvaluationResult:
     iou_thresholds: tuple[float, ...]
     classes: tuple[ClassMetrics, ...]
     notes: tuple[str, ...] = ()
+    f1: float = 0.0
 
     def as_dict(self) -> dict:
         """JSON-serialisable view."""
         return {
             "mAP50": round(self.map50, 6),
             "mAP50_95": round(self.map50_95, 6),
+            "f1": round(self.f1, 6),
             "iou_thresholds": list(self.iou_thresholds),
             "classes": [
                 {
@@ -78,8 +84,12 @@ class EvaluationResult:
                     "name": item.name,
                     "gt": item.num_gt,
                     "predictions": item.num_pred,
+                    "tp": item.tp,
+                    "fp": item.fp,
+                    "fn": item.fn,
                     "precision": round(item.precision, 6),
                     "recall": round(item.recall, 6),
+                    "f1": round(item.f1, 6),
                     "AP50": round(item.ap50, 6),
                     "AP50_95": round(item.ap50_95, 6),
                 }
@@ -206,6 +216,12 @@ def _evaluate_class(
         if abs(threshold - 0.5) < 1e-9:
             precision, recall = _best_f1(curve_recall, curve_precision)
 
+    tp_50, fp_50 = _match_threshold(preds, gt_by_image, 0.5)
+    tp_count = sum(tp_50)
+    fp_count = sum(fp_50)
+    fn_count = max(0, num_gt - tp_count)
+    f1 = (2.0 * precision * recall / (precision + recall)) if (precision + recall) > 0.0 else 0.0
+
     ap50 = ap_by_threshold[0] if ap_by_threshold else 0.0
     return ClassMetrics(
         class_id=class_id,
@@ -216,6 +232,10 @@ def _evaluate_class(
         ap50_95=_mean(ap_by_threshold),
         precision=precision,
         recall=recall,
+        f1=f1,
+        tp=tp_count,
+        fp=fp_count,
+        fn=fn_count,
     )
 
 
@@ -257,12 +277,15 @@ def evaluate(
         _evaluate_class(class_id, names.get(class_id, str(class_id)), ground_truth, predictions, iou_thresholds)
         for class_id in class_ids
     )
+    scored_classes = [item for item in classes if item.num_gt > 0]
+    macro_f1 = _mean([item.f1 for item in scored_classes]) if scored_classes else 0.0
     return EvaluationResult(
         map50=_mean([item.ap50 for item in classes]),
         map50_95=_mean([item.ap50_95 for item in classes]),
         iou_thresholds=tuple(float(threshold) for threshold in iou_thresholds),
         classes=classes,
         notes=tuple(notes),
+        f1=macro_f1,
     )
 
 

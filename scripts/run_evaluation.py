@@ -140,6 +140,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Owner id recorded for --record (default is the CLI sentinel).",
     )
     parser.add_argument("--name", default=None, help="Experiment name (default: timestamp).")
+    parser.add_argument("--purpose", default="", help="Research purpose or question.")
     parser.add_argument("--notes", default="", help="Optional experiment notes.")
     parser.add_argument(
         "--list-models", action="store_true", help="List models and their classes, then exit."
@@ -279,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"  mAP@0.5={headline['mAP50']:.4f}  "
                 f"mAP@0.5:0.95={headline['mAP50_95']:.4f}  "
                 f"P={headline['precision']:.4f} R={headline['recall']:.4f} "
+                f"F1={headline.get('f1', 0.0):.4f} "
                 f"({headline['seconds_per_image']:.3f}s/image)"
             )
             for note in evaluation.notes:
@@ -361,7 +363,7 @@ def main(argv: list[str] | None = None) -> int:
             owner,
             exp_name,
             notes=args.notes,
-            purpose="Command-line evaluation (scripts/run_evaluation.py).",
+            purpose=args.purpose or "Command-line evaluation (scripts/run_evaluation.py).",
             dataset_id=dataset_record.id,
             dataset_name=dataset.name,
             data_yaml=str(data_yaml),

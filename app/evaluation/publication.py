@@ -49,6 +49,7 @@ HEADLINE_COLUMNS: tuple[tuple[str, str, bool], ...] = (
     ("mAP50_95", "mAP@0.5:0.95", True),
     ("precision", "Precision", True),
     ("recall", "Recall", True),
+    ("f1", "F1", True),
     ("seconds_per_image", "s/image", True),
     ("classes_scored", "Classes scored", True),
     ("classes_unsupported", "Dataset classes unsupported", False),
@@ -62,8 +63,12 @@ PER_CLASS_COLUMNS: tuple[tuple[str, str, bool], ...] = (
     ("class_name", "Class", False),
     ("gt", "GT", True),
     ("predictions", "Pred", True),
+    ("tp", "TP", True),
+    ("fp", "FP", True),
+    ("fn", "FN", True),
     ("precision", "Precision", True),
     ("recall", "Recall", True),
+    ("f1", "F1", True),
     ("AP50", "AP50", True),
     ("AP50_95", "AP50:0.95", True),
 )
@@ -111,6 +116,7 @@ def headline_rows(experiments: Sequence) -> list[dict]:
                     "mAP50_95": _num(summary.get("mAP50_95")),
                     "precision": _num(summary.get("precision")),
                     "recall": _num(summary.get("recall")),
+                    "f1": _num(summary.get("f1")),
                     "seconds_per_image": _num(summary.get("seconds_per_image")),
                     "classes_scored": len(comparison.supported),
                     "classes_unsupported": "; ".join(comparison.unsupported),
@@ -135,8 +141,12 @@ def per_class_rows(experiments: Sequence) -> list[dict]:
                         "class_name": item.get("name", ""),
                         "gt": item.get("gt", 0),
                         "predictions": item.get("predictions", 0),
+                        "tp": int(item.get("tp", 0)),
+                        "fp": int(item.get("fp", 0)),
+                        "fn": int(item.get("fn", 0)),
                         "precision": _num(item.get("precision")),
                         "recall": _num(item.get("recall")),
+                        "f1": _num(item.get("f1")),
                         "AP50": _num(item.get("AP50")),
                         "AP50_95": _num(item.get("AP50_95")),
                     }
@@ -467,6 +477,17 @@ def build_bundle(experiments: Sequence, output_dir: str | Path) -> dict[str, Pat
     _write("publication_per_class.csv", to_csv(per_class_rows(experiments), PER_CLASS_COLUMNS))
     _write("publication_tables.md", render_markdown(experiments))
     _write("publication_tables.tex", render_latex(experiments))
+    _write(
+        "publication_experiments.json",
+        json.dumps(
+            [
+                exp.as_dict() if hasattr(exp, "as_dict") else dict(exp)
+                for exp in experiments
+            ],
+            indent=2,
+            default=str,
+        ),
+    )
     _write(
         "dataset_cards.md",
         "\n\n".join(dataset_card(experiment) for experiment in experiments),

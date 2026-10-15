@@ -100,14 +100,17 @@ class ModelEvaluation:
         }
 
 
-def _aggregate(metrics: EvaluationResult) -> tuple[float, float]:
-    """Mean per-class precision / recall over classes with ground truth."""
+def _aggregate(metrics: EvaluationResult) -> tuple[float, float, float]:
+    """Mean per-class precision / recall / F1 over classes with ground truth."""
     scored = [item for item in metrics.classes if item.num_gt > 0]
     if not scored:
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0
     precision = sum(item.precision for item in scored) / len(scored)
     recall = sum(item.recall for item in scored) / len(scored)
-    return precision, recall
+    f1 = sum(item.f1 for item in scored) / len(scored)
+    if f1 == 0.0 and (precision + recall) > 0:
+        f1 = (2.0 * precision * recall) / (precision + recall)
+    return precision, recall, f1
 
 
 def run_evaluation(
@@ -205,7 +208,10 @@ def run_evaluation(
 
 def summarise(evaluation: ModelEvaluation) -> dict:
     """Convenience view: headline metrics plus timing for one evaluation."""
-    precision, recall = _aggregate(evaluation.metrics)
+    precision, recall, f1 = _aggregate(evaluation.metrics)
+    total_tp = sum(item.tp for item in evaluation.metrics.classes)
+    total_fp = sum(item.fp for item in evaluation.metrics.classes)
+    total_fn = sum(item.fn for item in evaluation.metrics.classes)
     return {
         "model": evaluation.model,
         "dataset": evaluation.dataset,
@@ -213,10 +219,14 @@ def summarise(evaluation: ModelEvaluation) -> dict:
         "status": evaluation.status,
         "images": evaluation.images_evaluated,
         "objects": sum(item.num_gt for item in evaluation.metrics.classes),
+        "tp": total_tp,
+        "fp": total_fp,
+        "fn": total_fn,
         "mAP50": evaluation.metrics.map50,
         "mAP50_95": evaluation.metrics.map50_95,
         "precision": precision,
         "recall": recall,
+        "f1": f1,
         "seconds_per_image": evaluation.seconds_per_image,
     }
 
