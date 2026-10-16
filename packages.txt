@@ -1,0 +1,6 @@
+# Apt packages installed by Streamlit Community Cloud (Debian 11 runners).
+# Same set the Dockerfile installs: OpenCV needs libGL and GLib at import
+# time. PyTorch wheels bundle their own libgomp, so nothing else is required;
+# imageio-ffmpeg ships a self-contained ffmpeg binary (no apt ffmpeg).
+libgl1
+libglib2.0-0

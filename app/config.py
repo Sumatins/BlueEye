@@ -70,6 +70,36 @@ def load_env_file(path: Path | None = None) -> None:
         logging.getLogger(__name__).warning("Could not read %s: %s", env_path, exc)
 
 
+def load_streamlit_secrets() -> None:
+    """Merge ``BLUEEYE_*`` keys from Streamlit secrets into ``os.environ``.
+
+    Streamlit Community Cloud (and ``streamlit run`` with a secrets file)
+    expose deployment configuration through ``st.secrets`` rather than process
+    environment variables, and BlueEye reads ``BLUEEYE_*`` from the
+    environment, so the two are bridged here. Existing environment variables
+    are never overwritten, non-``BLUEEYE_`` keys are ignored (a secrets file
+    may hold unrelated credentials), and when no secrets file exists this is
+    a no-op - local development and the CLI are unaffected.
+    """
+    secrets_path = PROJECT_ROOT / ".streamlit" / "secrets.toml"
+    if not secrets_path.is_file():
+        return
+    logger = logging.getLogger(__name__)
+    try:
+        import streamlit as st
+
+        for key in st.secrets.keys():
+            if not key.startswith(ENV_PREFIX):
+                continue
+            value = st.secrets[key]
+            if not isinstance(value, str):
+                logger.warning("Ignoring non-string secret %s (expected a string).", key)
+                continue
+            os.environ.setdefault(key, value)
+    except Exception as exc:  # noqa: BLE001 - secrets are optional; never block startup
+        logger.warning("Could not read %s: %s", secrets_path, exc)
+
+
 def _env_str(key: str, default: str) -> str:
     return os.environ.get(ENV_PREFIX + key, default)
 
@@ -304,6 +334,7 @@ def get_settings() -> Settings:
         return cached
 
     load_env_file()
+    load_streamlit_secrets()
 
     settings = Settings(
         models_dir=_resolve_path(

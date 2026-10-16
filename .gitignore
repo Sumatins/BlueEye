@@ -161,6 +161,8 @@ outputs/
 _report_text.txt
 .streamlit/*
 !.streamlit/config.toml
+# The secrets TEMPLATE is committed (placeholders only); real secrets stay ignored.
+!.streamlit/secrets.toml.example
 
 **/.vscode/*
 !.vscode/settings.json
