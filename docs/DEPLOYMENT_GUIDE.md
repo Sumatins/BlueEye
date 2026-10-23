@@ -1,5 +1,12 @@
 # BlueEye deployment guide
 
+> **Live instance (verified 2026-10-23):** <https://blueeye-aquatic.streamlit.app>
+> Branch `model-investigation`, entrypoint `app/ui/streamlit_app.py`, Python 3.12,
+> Secrets empty. Verified end-to-end on the public URL: health `ok`, account
+> creation, `fish_inv` weights download (Azure SAS → "Ready and verified"),
+> real inference (3 detections / 2 classes with boxes and confidences),
+> observation saved to the account library, Species Explorer rendering.
+
 This guide deploys the complete BlueEye Streamlit app to a public URL on
 **Streamlit Community Cloud** (free). It was produced by a 10-phase audit of
 the repository; every claim below is either measured from this codebase or
@@ -38,8 +45,8 @@ the cloud.
 
 | File | Purpose |
 | --- | --- |
-| `app/ui/requirements.txt` | Deployment-only dependency file. Community Cloud installs the requirements file closest to the entrypoint (`app/ui/streamlit_app.py`), so this file (not the root one) is used in the cloud. It `-r`-includes the root `requirements.txt` and pins `torch==2.13.0+cpu` / `torchvision==0.28.0+cpu` from the official PyTorch CPU index, so the Linux runners never pull multi-GB CUDA wheels. Wheels verified to exist for Linux cp311 and cp312. |
-| `packages.txt` | Apt packages installed on the Debian runners: `libgl1`, `libglib2.0-0` (needed by OpenCV at import). PyTorch bundles its own `libgomp`; `imageio-ffmpeg` ships a self-contained ffmpeg binary. |
+| `app/ui/requirements.txt` | Deployment-only dependency file. Community Cloud installs the requirements file closest to the entrypoint (`app/ui/streamlit_app.py`), so this file (not the root one) is used in the cloud. It `-r`-includes the root `requirements.txt`, pins `torch==2.13.0+cpu` / `torchvision==0.28.0+cpu` from the official PyTorch CPU index (so the Linux runners never pull multi-GB CUDA wheels; wheels verified for Linux cp311/cp312), and pins `streamlit==1.61.1` — the exact locally tested release. Newer Streamlit releases (e.g. 1.66.x, which `>=1.49` resolves to unpinned) change the widget DOM that `app/ui/theme.py` styles and render the themed sidebar unstyled. |
+| `packages.txt` | Apt packages installed on the Debian runners: `libgl1`, `libglib2.0-0` (needed by OpenCV at import). PyTorch bundles its own `libgomp`; `imageio-ffmpeg` ships a self-contained ffmpeg binary. **No `#` comments allowed:** the platform passes every whitespace-separated token straight to `apt-get install`, so a comment line fails the whole build with `E: Unable to locate package #`. Bare package names only. |
 | `.streamlit/secrets.toml.example` | Placeholder-only template documenting the optional `BLUEEYE_*` deployment values. The real `.streamlit/secrets.toml` stays git-ignored. |
 | `app/config.py::load_streamlit_secrets` | Merges `BLUEEYE_*` keys from `st.secrets` into the environment before settings are built (Community Cloud delivers config via secrets, not env vars). Never overwrites real env vars; no-op when no secrets file exists. Covered by `tests/test_deployment_config.py`. |
 
@@ -61,9 +68,15 @@ You need push access to the GitHub repository.
    - Branch: `model-investigation`
    - Main file path: `app/ui/streamlit_app.py`
 4. **Advanced settings** →
-   - Python version: **3.12** (the version the whole stack is tested on)
+   - Python version: **3.12** (the version the whole stack is tested on;
+     Streamlit's own default may be newer — do not accept it)
    - Leave the Secrets field **empty** for now (see the next section)
-5. **Deploy!** The first build installs dependencies (several minutes). Watch
+5. *(Optional)* set an **App URL** subdomain (e.g. `blueeye-aquatic`) so the
+   share link is memorable. If the value from the deploy form does not stick,
+   the app is still created (with a generated subdomain) — rename it afterwards
+   via the app's `⋮` menu → **Settings** → **App URL** → *Save changes*.
+   The rename takes effect immediately and does not redeploy.
+6. **Deploy!** The first build installs dependencies (several minutes). Watch
    the build log for `You can now view your Streamlit app in your browser`.
 
 ### Optional deployment configuration
@@ -119,7 +132,10 @@ that is the point to move to Render (see below).
 ## Health checks, logs, verification
 
 - **Health endpoint:** `GET /_stcore/health` returns `ok` when the server is
-  up (the Dockerfile already uses this for its container health check).
+  up (the Dockerfile already uses this for its container health check). On
+  Community Cloud the app runs behind an iframe at `/~/+/`, so the public URL
+  is `https://<app>.streamlit.app/~/+/_stcore/health` (the domain root serves
+  Streamlit's wrapper page, not the app).
 - **Logs:** the deployment dashboard shows build and runtime logs; the app
   logs through Python `logging` at `BLUEEYE_LOG_LEVEL` (default `INFO`).
 - **Verify a deployment end-to-end:** open the URL, create an account, open
@@ -151,6 +167,8 @@ were wiped by the redeploy).
 | Symptom | Cause & fix |
 | --- | --- |
 | Build fails resolving `torch` | The CPU index pin in `app/ui/requirements.txt` is missing or the platform picked up the root `requirements.txt` instead. Ensure the entrypoint is `app/ui/streamlit_app.py` (the file next to it wins). |
+| `Error installing requirements` with `E: Unable to locate package #` / `Apt` / `packages` in the log | `packages.txt` contains `#` comment lines — the platform forwards every token to `apt-get`. Keep bare package names only (see the Files table above). |
+| App boots but the sidebar renders unstyled (no group headers, no icons, every nav item identical) | Streamlit version drift: the cloud installed a newer Streamlit than the one `app/ui/theme.py` was styled against. Keep the `streamlit==1.61.1` pin in `app/ui/requirements.txt`; the deploy terminal's `Found Streamlit version …` line shows what actually ran. |
 | `libGL.so.1: cannot open shared object file` | `packages.txt` missing from the repository root; restore it and redeploy. |
 | App starts but every page reports missing weights | Expected on a fresh deploy/restart — download weights from the Models page (see above). |
 | App killed with no Python traceback during inference | Out-of-memory: the 1 GB limit. Use a single model (see Memory budget). |
