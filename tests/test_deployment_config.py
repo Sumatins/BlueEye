@@ -146,6 +146,10 @@ def test_deployment_requirements_include_root_and_cpu_pins():
     assert "--extra-index-url https://download.pytorch.org/whl/cpu" in text
     assert "torch==2.13.0+cpu" in text
     assert "torchvision==0.28.0+cpu" in text
+    # The design system styles Streamlit's widget DOM, so the cloud build must
+    # use the exact locally tested Streamlit release (1.61.1); newer releases
+    # change the markup and render the themed sidebar unstyled.
+    assert "streamlit==1.61.1" in text
 
 
 def test_packages_txt_installs_opencv_system_libs():

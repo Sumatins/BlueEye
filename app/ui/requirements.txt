@@ -17,3 +17,10 @@
 
 torch==2.13.0+cpu
 torchvision==0.28.0+cpu
+
+# Pin Streamlit to the locally tested version. BlueEye's design system
+# (app/ui/theme.py) styles Streamlit's widget DOM (radio nav groups, icons),
+# and newer Streamlit releases change that markup; a 2026-10 deploy silently
+# picked up 1.66.x and rendered the sidebar unstyled. The root requirements.txt
+# keeps the compatible range (>=1.49) for local development.
+streamlit==1.61.1
