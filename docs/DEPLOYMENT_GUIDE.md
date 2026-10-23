@@ -93,22 +93,31 @@ BLUEEYE_DEFAULT_MODEL = "fish_inv"
 `auto`/`all` load every installed model and can exceed the 1 GB limit; a single
 model id keeps the app comfortably inside it.
 
-## Model weights (required before the app can detect anything)
+## Model weights (auto-installed on a fresh deployment)
 
 Weights are **not** in the repository (652 MB across nine models; GitHub caps
-files at 100 MB and the code loads them by filename). On a fresh deployment
-`models/` is empty and every page that needs inference will say so honestly —
-there is no mock fallback. To make the app detect:
+files at 100 MB and the code loads them by filename), and there is no mock
+fallback — a page that needs inference says so honestly. To remove the manual
+download step, the app **bootstraps its own core weights**
+(`app/detection/bootstrap.py`):
 
-1. Open the deployed app → **Models** page.
-2. Download at least one core model with the in-app button
-   (`fish_inv` ≈ 87 MB or `megafauna` ≈ 87 MB; download URLs for the two core
-   models are Azure SAS links from the project's public asset store, the six
-   additional models come from HF/Zenodo/GitHub/GCS with SHA-256 pinning via
-   `scripts/fetch_additional_models.py`).
-3. Weights persist **only until the next restart/redeploy**. After any
-   restart you must download them again. Plan demos accordingly, or move to
-   Render with a persistent disk (below).
+* at process start, a background daemon thread downloads `fish_inv`
+  (≈87 MB, Azure SAS link from the project's public asset store) when its
+  weights are missing — silent, non-blocking, and it can never crash the app;
+* if a user reaches **AI Detection** before the transfer finishes, the page
+  shows it with a real progress bar and continues into the normal workflow;
+* transfers reuse the Models-page code path (same size / SHA-256 checks), a
+  process-wide lock prevents concurrent writers, and any failure degrades to
+  the honest manual-install card.
+
+Control it via Secrets: `BLUEEYE_AUTO_DOWNLOAD_WEIGHTS = "off"` disables the
+bootstrap; `BLUEEYE_DEFAULT_MODEL = "megafauna"` makes that model the one to
+prepare instead. The remaining models (six additional ones from
+HF/Zenodo/GitHub/GCS with SHA-256 pinning via
+`scripts/fetch_additional_models.py`) install from the **Models** page on
+demand. Weights persist **only until the next restart/redeploy** — every
+restart simply re-runs the bootstrap. For permanent weights, move to Render
+with a persistent disk (below).
 
 ## Memory budget (read before a live demo)
 
@@ -170,7 +179,7 @@ were wiped by the redeploy).
 | `Error installing requirements` with `E: Unable to locate package #` / `Apt` / `packages` in the log | `packages.txt` contains `#` comment lines — the platform forwards every token to `apt-get`. Keep bare package names only (see the Files table above). |
 | App boots but the sidebar renders unstyled (no group headers, no icons, every nav item identical) | Streamlit version drift: the cloud installed a newer Streamlit than the one `app/ui/theme.py` was styled against. Keep the `streamlit==1.61.1` pin in `app/ui/requirements.txt`; the deploy terminal's `Found Streamlit version …` line shows what actually ran. |
 | `libGL.so.1: cannot open shared object file` | `packages.txt` missing from the repository root; restore it and redeploy. |
-| App starts but every page reports missing weights | Expected on a fresh deploy/restart — download weights from the Models page (see above). |
+| App starts but AI Detection reports missing weights | The automatic bootstrap is disabled (`BLUEEYE_AUTO_DOWNLOAD_WEIGHTS=off`) or its transfer failed (see the app log for `Weight bootstrap:` lines). Download from the Models page, or fix connectivity and reload. |
 | App killed with no Python traceback during inference | Out-of-memory: the 1 GB limit. Use a single model (see Memory budget). |
 | Long cold start after idle | Hibernation; the first visit rebuilds the container. |
 | Need persistent history or all models | Move to Render with a persistent disk (see below). |

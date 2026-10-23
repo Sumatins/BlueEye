@@ -157,6 +157,11 @@ class Settings:
     default_confidence: float = DEFAULT_CONFIDENCE
     default_device: str = DEFAULT_DEVICE
     enhancement_enabled: bool = False
+    #: Automatically fetch the core model weights when they are missing
+    #: (ephemeral deployments lose ``models/`` on every restart). See
+    #: :mod:`app.detection.bootstrap`; disable with
+    #: ``BLUEEYE_AUTO_DOWNLOAD_WEIGHTS=off``.
+    auto_download_weights: bool = True
 
     # Upload safety limits.
     max_image_mb: int = DEFAULT_MAX_IMAGE_MB
@@ -350,6 +355,8 @@ def get_settings() -> Settings:
         default_confidence=_env_float("DEFAULT_CONFIDENCE", DEFAULT_CONFIDENCE),
         default_device=_env_str("DEVICE", DEFAULT_DEVICE),
         enhancement_enabled=_env_str("ENHANCEMENT", "off").lower() in {"on", "true", "1", "yes"},
+        auto_download_weights=_env_str("AUTO_DOWNLOAD_WEIGHTS", "on").lower()
+        in {"on", "true", "1", "yes"},
         max_image_mb=_env_int("MAX_IMAGE_MB", DEFAULT_MAX_IMAGE_MB),
         max_video_mb=_env_int("MAX_VIDEO_MB", DEFAULT_MAX_VIDEO_MB),
         auth_db=_resolve_path(_env_str("AUTH_DB", ""), PROJECT_ROOT / "outputs" / "auth" / "blueeye_auth.db")

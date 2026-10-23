@@ -33,8 +33,9 @@ Short, ordered checklist. Full rationale and troubleshooting:
       Streamlit's wrapper page)
 - [x] App loads; create an account; sidebar shows all 12 pages with the
       themed groups/icons (identical to local)
-- [x] Models page → download `fish_inv` (in-app button) → card flips to
-      "Ready and verified" (real load + inference test on the cloud CPU)
+- [x] Models page → weights auto-install in the background on a fresh deploy
+      (`fish_inv`, ~87 MB, `app/detection/bootstrap.py`); manual button still
+      works — card flips to "Ready and verified" (real load + inference test)
 - [x] Detect page → real image → real boxes/classes/confidences, no mock data
       (verified: 3 detections, 2 classes, fish_inv attribution)
 - [x] Observation saved → visible in My Observations (account library write works)
@@ -44,7 +45,9 @@ Short, ordered checklist. Full rationale and troubleshooting:
 ## Operating notes
 
 - [ ] Recommended on the 1 GB free tier: `BLUEEYE_DEFAULT_MODEL = "fish_inv"` in Secrets
-- [x] Weights and history are wiped on every restart/redeploy — re-download after restarts
+- [x] Weights and history are wiped on every restart/redeploy — the core
+      model re-installs automatically at startup (`BLUEEYE_AUTO_DOWNLOAD_WEIGHTS`
+      to opt out); other models: re-download from the Models page
 - [x] Updates: push to `model-investigation` (auto-redeploy); rollback: `git revert` + push
 - [ ] Outgrown the free tier (persistence / all 9 models)? Move to Render per the guide
 
