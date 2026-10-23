@@ -24,3 +24,10 @@ torchvision==0.28.0+cpu
 # picked up 1.66.x and rendered the sidebar unstyled. The root requirements.txt
 # keeps the compatible range (>=1.49) for local development.
 streamlit==1.61.1
+
+# NOTE (2026-10-24): editing THIS file makes Streamlit Community Cloud rebuild
+# the whole container (fresh venv + fresh Python process). Code-only pushes are
+# sometimes absorbed as in-place pulls without a runtime restart, which can
+# leave stale modules imported (AttributeError on a name that exists in the
+# commit). If the live app ever crashes that way after a push, touch this file
+# (or reboot the app from manage app -> the dots menu) to get a clean runtime.
