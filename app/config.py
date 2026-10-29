@@ -70,6 +70,36 @@ def load_env_file(path: Path | None = None) -> None:
         logging.getLogger(__name__).warning("Could not read %s: %s", env_path, exc)
 
 
+def load_streamlit_secrets() -> None:
+    """Merge ``BLUEEYE_*`` keys from Streamlit secrets into ``os.environ``.
+
+    Streamlit Community Cloud (and ``streamlit run`` with a secrets file)
+    expose deployment configuration through ``st.secrets`` rather than process
+    environment variables, and BlueEye reads ``BLUEEYE_*`` from the
+    environment, so the two are bridged here. Existing environment variables
+    are never overwritten, non-``BLUEEYE_`` keys are ignored (a secrets file
+    may hold unrelated credentials), and when no secrets file exists this is
+    a no-op - local development and the CLI are unaffected.
+    """
+    secrets_path = PROJECT_ROOT / ".streamlit" / "secrets.toml"
+    if not secrets_path.is_file():
+        return
+    logger = logging.getLogger(__name__)
+    try:
+        import streamlit as st
+
+        for key in st.secrets.keys():
+            if not key.startswith(ENV_PREFIX):
+                continue
+            value = st.secrets[key]
+            if not isinstance(value, str):
+                logger.warning("Ignoring non-string secret %s (expected a string).", key)
+                continue
+            os.environ.setdefault(key, value)
+    except Exception as exc:  # noqa: BLE001 - secrets are optional; never block startup
+        logger.warning("Could not read %s: %s", secrets_path, exc)
+
+
 def _env_str(key: str, default: str) -> str:
     return os.environ.get(ENV_PREFIX + key, default)
 
@@ -127,6 +157,17 @@ class Settings:
     default_confidence: float = DEFAULT_CONFIDENCE
     default_device: str = DEFAULT_DEVICE
     enhancement_enabled: bool = False
+    #: Automatically fetch the core model weights when they are missing
+    #: (ephemeral deployments lose ``models/`` on every restart). See
+    #: :mod:`app.detection.bootstrap`; disable with
+    #: ``BLUEEYE_AUTO_DOWNLOAD_WEIGHTS=off``.
+    auto_download_weights: bool = True
+    #: How many loaded models are kept in memory at once (least recently
+    #: used evicted first). The Community Cloud tier has ~1 GB RAM, so a
+    #: "run every installed model" pass must not keep every checkpoint
+    #: resident. ``1`` = strictly one at a time;
+    #: tune with ``BLUEEYE_MAX_LOADED_MODELS``.
+    max_loaded_models: int = 2
 
     # Upload safety limits.
     max_image_mb: int = DEFAULT_MAX_IMAGE_MB
@@ -304,6 +345,7 @@ def get_settings() -> Settings:
         return cached
 
     load_env_file()
+    load_streamlit_secrets()
 
     settings = Settings(
         models_dir=_resolve_path(
@@ -319,6 +361,9 @@ def get_settings() -> Settings:
         default_confidence=_env_float("DEFAULT_CONFIDENCE", DEFAULT_CONFIDENCE),
         default_device=_env_str("DEVICE", DEFAULT_DEVICE),
         enhancement_enabled=_env_str("ENHANCEMENT", "off").lower() in {"on", "true", "1", "yes"},
+        auto_download_weights=_env_str("AUTO_DOWNLOAD_WEIGHTS", "on").lower()
+        in {"on", "true", "1", "yes"},
+        max_loaded_models=max(1, _env_int("MAX_LOADED_MODELS", 2)),
         max_image_mb=_env_int("MAX_IMAGE_MB", DEFAULT_MAX_IMAGE_MB),
         max_video_mb=_env_int("MAX_VIDEO_MB", DEFAULT_MAX_VIDEO_MB),
         auth_db=_resolve_path(_env_str("AUTH_DB", ""), PROJECT_ROOT / "outputs" / "auth" / "blueeye_auth.db")

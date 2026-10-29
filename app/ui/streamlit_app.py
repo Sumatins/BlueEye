@@ -147,6 +147,7 @@ def main() -> None:
 
     settings = state.get_settings_cached()
     detector = state.get_detector()
+    state.start_weight_bootstrap()
     state.init_session(settings)
 
     # Resolve the authenticated account (server-side token validation). This

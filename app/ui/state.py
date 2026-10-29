@@ -71,6 +71,22 @@ def get_detector() -> MarineDetector:
 
 
 @st.cache_resource(show_spinner=False)
+def start_weight_bootstrap() -> bool:
+    """Install the core model weights in the background, once per process.
+
+    Deployments without a persistent disk (Streamlit Community Cloud) lose
+    ``models/`` on every restart; without this a fresh container would make
+    every visitor click *Download* before the first detection. The transfer
+    runs in a daemon thread (see :mod:`app.detection.bootstrap`), so the UI
+    never blocks on it and a failure is only ever a logged warning.
+    """
+    from app.detection.bootstrap import bootstrap_keys, start_background_bootstrap
+
+    manager = get_detector().model_manager
+    return start_background_bootstrap(manager, bootstrap_keys(get_settings(), manager.registry()))
+
+
+@st.cache_resource(show_spinner=False)
 def get_settings_cached():
     settings = get_settings()
     settings.ensure_dirs()

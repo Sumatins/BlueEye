@@ -21,6 +21,7 @@ from PIL import Image
 import streamlit as st
 
 from app.config import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+from app.detection.bootstrap import bootstrap_keys, ensure_weights
 from app.detection.detector import MarineDetector
 from app.detection.model_manager import ModelError
 from app.observations.models import ObservationError
@@ -75,8 +76,9 @@ def render(detector: MarineDetector, settings, user=None) -> None:
     )
 
     if not state.any_model_available(detector):
-        _render_no_weights(detector)
-        return
+        if not _bootstrap_missing_weights(detector, settings):
+            _render_no_weights(detector)
+            return
 
     user_id = user.id if user else None
     if media == "Image":
@@ -119,6 +121,55 @@ def _download_all(detector: MarineDetector) -> None:
     except ModelError as exc:
         error_card(st, "Download failed", str(exc))
         logger.warning("Model download failed: %s", exc)
+
+
+def _bootstrap_missing_weights(detector: MarineDetector, settings) -> bool:
+    """Auto-install the core weights on a fresh deployment, visibly.
+
+    Returns ``True`` when weights became available so the normal workflow
+    can continue in the same run. This is the on-demand fallback for the
+    silent background bootstrap (see ``app.detection.bootstrap``): users
+    who reach this page before the transfer finished simply watch it
+    complete here, with honest progress. Failures return ``False`` so the
+    caller shows the manual-install card - nothing is ever faked.
+    """
+    manager = detector.model_manager
+    keys = bootstrap_keys(settings, manager.registry())
+    if not keys:
+        return False
+    spec = manager.get_spec(keys[0])
+    bar = None
+    status = None
+    try:
+        status = st.status(
+            f"Preparing {spec.display_name} weights - one-time per deployment...",
+            expanded=True,
+        )
+        with status:
+            bar = st.progress(0.0, text="Downloading official weights...")
+
+            def _report(done: int, total: int | None) -> None:
+                if total:
+                    bar.progress(
+                        min(done / total, 1.0),
+                        text=f"{done / 1e6:.0f} of {total / 1e6:.0f} MB",
+                    )
+                else:
+                    bar.progress(0.0, text=f"{done / 1e6:.0f} MB downloaded...")
+
+            ensure_weights(manager, keys[0], progress=_report)
+            bar.progress(1.0, text="Verified")
+            status.update(label=f"{spec.display_name} weights ready", state="complete")
+        logger.info("Weights for '%s' prepared on demand", keys[0])
+        return True
+    except ModelError as exc:
+        if status is not None:
+            status.update(label=f"Weight download failed: {exc}", state="error")
+        logger.warning("On-demand weight download failed: %s", exc)
+        return False
+    finally:
+        if bar is not None:
+            bar.empty()
 
 
 def _selection_guard(detector: MarineDetector) -> str | None:

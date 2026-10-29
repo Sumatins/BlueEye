@@ -1,0 +1,41 @@
+# Deployment-only dependencies for Streamlit Community Cloud.
+#
+# Community Cloud installs dependencies from the requirements file closest to
+# the entrypoint (`app/ui/streamlit_app.py`), which is this file; the root
+# requirements.txt is NOT read when this file exists. We therefore include the
+# root file explicitly so there is a single source of truth for the app's
+# dependencies, and only override what the Linux cloud runners need.
+
+# Linux CPU-only wheels. The default PyPI wheels pull in multi-gigabyte CUDA
+# libraries that exceed the platform's build limits; BlueEye's inference is
+# CPU-only anyway (app/config.py falls back to CPU when CUDA is unavailable).
+# Pins match the locally tested environment (Python 3.12, torch 2.13.0+cpu,
+# torchvision 0.28.0+cpu); wheels were verified to exist for Linux cp312/cp311.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+-r ../../requirements.txt
+
+torch==2.13.0+cpu
+torchvision==0.28.0+cpu
+
+# Pin Streamlit to the locally tested version. BlueEye's design system
+# (app/ui/theme.py) styles Streamlit's widget DOM (radio nav groups, icons),
+# and newer Streamlit releases change that markup; a 2026-10 deploy silently
+# picked up 1.66.x and rendered the sidebar unstyled. The root requirements.txt
+# keeps the compatible range (>=1.49) for local development.
+streamlit==1.61.1
+
+# NOTE (2026-10-24): editing THIS file makes Streamlit Community Cloud rebuild
+# the whole container (fresh venv + fresh Python process). Code-only pushes are
+# sometimes absorbed as in-place pulls without a runtime restart, which can
+# leave stale modules imported (AttributeError on a name that exists in the
+# commit). If the live app ever crashes that way after a push, touch this file
+# (or reboot the app from manage app -> the dots menu) to get a clean runtime.
+#
+# NOTE (2026-10-29): touched to force the runtime restart that activates the
+# LRU model cache (BLUEEYE_MAX_LOADED_MODELS, commit 004e5de) before the
+# all-models demo. No dependency changes were made.
+#
+# NOTE (2026-10-29, later): touched again to recover the app after the
+# 9-model all-mode run OOM-killed the 1 GB container (obsea_mediterranean
+# alone needs ~1.6 GB). See docs/DEPLOYMENT_GUIDE.md "Memory budget".

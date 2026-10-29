@@ -207,6 +207,16 @@ class DatasetRecord:
     created_at: str = ""
     updated_at: str = ""
 
+    @property
+    def is_synthetic(self) -> bool:
+        return bool(
+            (self.validation or {}).get("is_synthetic")
+            or any(
+                token in self.name.lower() or token in self.data_yaml.lower()
+                for token in ("synthetic", "toy", "mock", "dummy")
+            )
+        )
+
     def as_dict(self) -> dict:
         return {
             "id": self.id,
@@ -217,6 +227,7 @@ class DatasetRecord:
             "fingerprint": self.fingerprint,
             "validation": self.validation,
             "notes": self.notes,
+            "is_synthetic": self.is_synthetic,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -329,6 +340,20 @@ class ExperimentRecord:
         evaluated = [value for value in values if value is not None]
         return float(max(evaluated)) if evaluated else None
 
+    @property
+    def duration_seconds(self) -> float | None:
+        if not self.started_at or not self.completed_at:
+            return None
+        try:
+            from app.evaluation.schedules import parse_timestamp
+            start = parse_timestamp(self.started_at)
+            end = parse_timestamp(self.completed_at)
+            if start and end:
+                return max(0.0, (end - start).total_seconds())
+        except Exception:
+            return None
+        return None
+
     def as_dict(self) -> dict:
         return {
             "id": self.id,
@@ -356,6 +381,7 @@ class ExperimentRecord:
             "created_at": self.created_at,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
+            "duration_seconds": self.duration_seconds,
             "updated_at": self.updated_at,
             "results": [result.as_dict() for result in self.results],
             "artifacts": [artifact.as_dict() for artifact in self.artifacts],

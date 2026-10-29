@@ -374,14 +374,18 @@ def tick_once(
                 model_fingerprints=model_fps,
             )
         except ScheduleRunError as exc:
-            sched_store.set_last_status(schedule.id, schedule.user_id, "blocked")
+            sched_store.set_last_status(
+                schedule.id, schedule.user_id, "blocked", error=str(exc)
+            )
             result.blocked.append(
                 {"id": schedule.id, "name": schedule.name, "reason": str(exc)}
             )
             logger.warning("Schedule %s blocked: %s", schedule.id, exc)
             continue
         except Exception as exc:  # noqa: BLE001 - one bad schedule must not stop the worker
-            sched_store.set_last_status(schedule.id, schedule.user_id, "failed")
+            sched_store.set_last_status(
+                schedule.id, schedule.user_id, "failed", error=str(exc)
+            )
             result.blocked.append(
                 {"id": schedule.id, "name": schedule.name, "reason": str(exc)}
             )

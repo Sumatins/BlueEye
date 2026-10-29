@@ -460,13 +460,16 @@ def iter_specs(manager: Any) -> list[ModelSpec]:
 class ModelManager:
     """Loads, caches and downloads YOLOv8 model weights.
 
-    Models are loaded **once** and kept in memory for the lifetime of the
-    manager, so video frames never trigger repeated disk loads.
+    Models are loaded once and kept in a small in-memory cache with
+    least-recently-used eviction (``settings.max_loaded_models`` entries,
+    default 2), so video frames never trigger repeated disk loads while
+    memory stays bounded on small hosts (~1 GB Community Cloud tier).
     """
 
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self._cache: dict[str, object] = {}
+        self.max_cached: int = max(1, int(getattr(self.settings, "max_loaded_models", 2)))
         self._device: str | None = None
         self._custom_cache: tuple[Path, dict[str, ModelSpec]] | None = None
 
@@ -546,6 +549,8 @@ class ModelManager:
         missing, with a message that tells the user how to obtain it.
         """
         if key in self._cache:
+            # LRU touch: move to the end (most recently used) before reuse.
+            self._cache[key] = self._cache.pop(key)
             return self._cache[key]
 
         spec = self.get_spec(key)
@@ -583,8 +588,27 @@ class ModelManager:
             ) from exc
         elapsed = (time.perf_counter() - started) * 1000
         logger.info("Loaded model '%s' in %.0f ms", key, elapsed)
-        self._cache[key] = model
+        self._store(key, model)
         return model
+
+    def _store(self, key: str, model: object) -> None:
+        """Cache a loaded model, evicting the least recently used first.
+
+        Keeps memory bounded on small hosts: a "run every installed
+        model" pass would otherwise keep every checkpoint resident and
+        exhaust the ~1 GB Community Cloud budget.
+        """
+        self._cache[key] = model  # dicts keep insertion order: last = newest
+        while len(self._cache) > self.max_cached:
+            oldest = next(iter(self._cache))
+            if oldest == key:
+                break
+            self._cache.pop(oldest)
+            logger.info(
+                "Evicted model '%s' from memory (max_cached=%d)",
+                oldest,
+                self.max_cached,
+            )
 
     def get_class_names(self, key: str) -> dict[int, str]:
         """Class names of a loaded model (``{index: name}``)."""
