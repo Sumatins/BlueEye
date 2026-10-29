@@ -24,6 +24,26 @@ import logging  # noqa: E402
 
 import streamlit as st  # noqa: E402
 
+# --- startup diagnostic (2026-10-29) -------------------------------------
+# Streamlit's crash page redacts the underlying exception message, which
+# made a boot-time imaging-dependency failure impossible to diagnose from
+# the deployed app. Surface the real traceback on the page once, then stop.
+try:  # noqa: C901 - tiny diagnostic guard, not control-flow complexity
+    import cv2  # noqa: F401,E402
+    import numpy  # noqa: F401,E402
+except BaseException:  # noqa: BLE001 - show the REAL failure unredacted
+    import traceback  # noqa: E402
+
+    st.error(
+        "**Startup diagnostic (BlueEye):** a core imaging dependency failed"
+        " to import, so the app cannot start.\n\n"
+        "```text\n" + traceback.format_exc() + "```\n\n"
+        "This panel intentionally shows the unredacted error to speed up"
+        " on-site debugging (Streamlit's own crash page hides the message)."
+    )
+    st.stop()
+# -------------------------------------------------------------------------
+
 from app import __version__  # noqa: E402
 from app.evaluation import scheduler as eval_scheduler  # noqa: E402
 from app.ui import auth_ui, state  # noqa: E402

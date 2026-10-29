@@ -44,3 +44,7 @@ streamlit==1.61.1
 # (`import cv2` failed in app/processing/enhancement.py - the system libs
 # from packages.txt or the opencv wheel did not install). No dependency
 # changes here; touching the file again to force a clean rebuild.
+#
+# NOTE (2026-10-29, diagnostic): rebuilt once more with an unredacted
+# cv2/numpy startup probe in app/ui/streamlit_app.py to capture the real
+# import failure text (Streamlit's crash page hides it).
