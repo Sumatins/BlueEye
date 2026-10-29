@@ -18,6 +18,17 @@
 torch==2.13.0+cpu
 torchvision==0.28.0+cpu
 
+# OpenCV ships here in two flavors. The root requirements.txt pins the GUI
+# wheel `opencv-python` (pulled in hard by ultralytics), whose Linux .so
+# links against libGL.so.1 and therefore only imports when the apt packages
+# from packages.txt installed correctly. On 2026-10-29 the apt step silently
+# failed on Streamlit Cloud and the whole app died at `import cv2`
+# (ImportError: libGL.so.1: cannot open shared object file).
+# `opencv-python-headless` at the SAME version provides the identical cv2
+# API without the system-library linkage, so the app boots even when the
+# GUI wheel cannot. The app never calls GUI window functions (cv2.imshow).
+opencv-python-headless==5.0.0.93
+
 # Pin Streamlit to the locally tested version. BlueEye's design system
 # (app/ui/theme.py) styles Streamlit's widget DOM (radio nav groups, icons),
 # and newer Streamlit releases change that markup; a 2026-10 deploy silently
