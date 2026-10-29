@@ -143,3 +143,25 @@ def test_download_all_fetches_every_model(settings, monkeypatch) -> None:
 
 def test_clear_cache_is_safe_when_empty(settings) -> None:
     ModelManager(settings).clear_cache()
+
+
+def test_max_cached_is_at_least_one(settings) -> None:
+    manager = ModelManager(settings)
+    assert manager.max_cached >= 1
+
+
+def test_store_evicts_least_recently_used_first(settings) -> None:
+    manager = ModelManager(settings)
+    manager.max_cached = 2
+    manager._store("a", object())
+    manager._store("b", object())
+    manager._store("c", object())
+    assert list(manager._cache) == ["b", "c"]
+
+
+def test_store_keeps_single_model_when_capacity_is_one(settings) -> None:
+    manager = ModelManager(settings)
+    manager.max_cached = 1
+    manager._store("a", object())
+    manager._store("b", object())
+    assert list(manager._cache) == ["b"]

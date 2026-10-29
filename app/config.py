@@ -162,6 +162,12 @@ class Settings:
     #: :mod:`app.detection.bootstrap`; disable with
     #: ``BLUEEYE_AUTO_DOWNLOAD_WEIGHTS=off``.
     auto_download_weights: bool = True
+    #: How many loaded models are kept in memory at once (least recently
+    #: used evicted first). The Community Cloud tier has ~1 GB RAM, so a
+    #: "run every installed model" pass must not keep every checkpoint
+    #: resident. ``1`` = strictly one at a time;
+    #: tune with ``BLUEEYE_MAX_LOADED_MODELS``.
+    max_loaded_models: int = 2
 
     # Upload safety limits.
     max_image_mb: int = DEFAULT_MAX_IMAGE_MB
@@ -357,6 +363,7 @@ def get_settings() -> Settings:
         enhancement_enabled=_env_str("ENHANCEMENT", "off").lower() in {"on", "true", "1", "yes"},
         auto_download_weights=_env_str("AUTO_DOWNLOAD_WEIGHTS", "on").lower()
         in {"on", "true", "1", "yes"},
+        max_loaded_models=max(1, _env_int("MAX_LOADED_MODELS", 2)),
         max_image_mb=_env_int("MAX_IMAGE_MB", DEFAULT_MAX_IMAGE_MB),
         max_video_mb=_env_int("MAX_VIDEO_MB", DEFAULT_MAX_VIDEO_MB),
         auth_db=_resolve_path(_env_str("AUTH_DB", ""), PROJECT_ROOT / "outputs" / "auth" / "blueeye_auth.db")
