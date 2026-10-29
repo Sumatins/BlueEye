@@ -39,3 +39,8 @@ streamlit==1.61.1
 # NOTE (2026-10-29, later): touched again to recover the app after the
 # 9-model all-mode run OOM-killed the 1 GB container (obsea_mediterranean
 # alone needs ~1.6 GB). See docs/DEPLOYMENT_GUIDE.md "Memory budget".
+#
+# NOTE (2026-10-29, final): that rebuild deployed with a broken runtime
+# (`import cv2` failed in app/processing/enhancement.py - the system libs
+# from packages.txt or the opencv wheel did not install). No dependency
+# changes here; touching the file again to force a clean rebuild.
