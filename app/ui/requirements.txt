@@ -35,3 +35,7 @@ streamlit==1.61.1
 # NOTE (2026-10-29): touched to force the runtime restart that activates the
 # LRU model cache (BLUEEYE_MAX_LOADED_MODELS, commit 004e5de) before the
 # all-models demo. No dependency changes were made.
+#
+# NOTE (2026-10-29, later): touched again to recover the app after the
+# 9-model all-mode run OOM-killed the 1 GB container (obsea_mediterranean
+# alone needs ~1.6 GB). See docs/DEPLOYMENT_GUIDE.md "Memory budget".

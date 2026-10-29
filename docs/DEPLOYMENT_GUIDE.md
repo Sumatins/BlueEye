@@ -121,20 +121,32 @@ with a persistent disk (below).
 
 ## Memory budget (read before a live demo)
 
-Measured CPU peaks for this codebase:
+Measured CPU peaks for this codebase (2026-10-29, one subprocess per model:
+load + one 640x480 inference; Linux cloud runners are in the same ballpark):
 
-| Scenario | Approx. peak RSS |
-| --- | --- |
-| App idle, no model loaded | ~35 MB |
-| `fish_inv` loaded | ~399 MB |
-| `fish_inv` + `megafauna` loaded | ~580 MB |
-| One prediction (image) | ~777 MB |
-| All nine models loaded | ~1.5 GB → **exceeds 1 GB limit** |
+| Model / scenario | Approx. peak RSS | Fits the 1 GB tier? |
+| --- | --- | --- |
+| App idle, no model loaded | ~35 MB | ✅ |
+| `underwater_fish` | ~355 MB | ✅ |
+| `wildlife_oi7` | ~415 MB | ✅ |
+| `aquatic_brackish` | ~436 MB | ✅ |
+| `fishial_detector` | ~657 MB | ✅ |
+| `aquarium_marine` (RT-DETR) | ~683 MB | ✅ |
+| `fish_inv` | ~736 MB | ✅ alone |
+| `megafauna` | ~740 MB | ✅ alone |
+| `fish_inv` + `megafauna` loaded | ~580-900 MB | ✅ (proven live) |
+| **`community_fish` (YOLOv12x)** | **~1151 MB** | ❌ alone exceeds 1 GB |
+| **`obsea_mediterranean` (YOLOv8x)** | **~1620 MB** | ❌ alone exceeds 1 GB |
 
-Safe recipe for the free tier: deploy a single core model
-(`BLUEEYE_DEFAULT_MODEL="fish_inv"`), avoid the "Every installed model"
-option on the Detect page, and keep video clips short (the 400 MB upload cap
-in `.streamlit/config.toml` is a *local* convenience; on the free tier a large
+The model cache is bounded by `BLUEEYE_MAX_LOADED_MODELS` (default 2, LRU
+eviction), so multi-model runs never *accumulate* memory - but the cap cannot
+make an oversized model fit. **On the free tier use `Auto` or a single model;
+`Every installed model` will OOM** because `obsea_mediterranean` and
+`community_fish` exceed 1 GB individually (live incident 2026-10-29: the
+9-model run killed the process mid-predict; their Models-page verification
+still passes because the 64x64 probe allocates almost no activations). Keep
+video clips short (the 400 MB upload cap in `.streamlit/config.toml` is a
+*local* convenience; on the free tier a large
 video will OOM before it finishes). If you need every model concurrently,
 that is the point to move to Render (see below).
 
