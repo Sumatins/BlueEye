@@ -31,3 +31,7 @@ streamlit==1.61.1
 # leave stale modules imported (AttributeError on a name that exists in the
 # commit). If the live app ever crashes that way after a push, touch this file
 # (or reboot the app from manage app -> the dots menu) to get a clean runtime.
+#
+# NOTE (2026-10-29): touched to force the runtime restart that activates the
+# LRU model cache (BLUEEYE_MAX_LOADED_MODELS, commit 004e5de) before the
+# all-models demo. No dependency changes were made.
